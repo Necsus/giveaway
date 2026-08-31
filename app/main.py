@@ -11,6 +11,8 @@ from app.giveaway import GiveawayEngine
 from app.history import restore_active_giveaway
 from app.service import GiveawayService
 from app.websocket import OverlayConnectionManager
+from app.settings import Settings
+from app.commands import GiveawayCommandHandler
 
 STATIC_DIRECTORY = Path(__file__).parent / "static"
 
@@ -20,13 +22,24 @@ overlay_connections = OverlayConnectionManager()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
+    settings = Settings()
+
     connection = connect_database()
     initialize_database(connection)
     _ = restore_active_giveaway(connection, giveaway_engine)
-    app.state.giveaway_service = GiveawayService(
+
+    giveaway_service = GiveawayService(
         giveaway_engine,
         connection,
         overlay_connections,
+    )
+
+    app.state.settings = settings
+    app.state.giveaway_service = giveaway_service
+    app.state.giveaway_command_handler = GiveawayCommandHandler(
+        service=giveaway_service,
+        broadcaster_id=settings.twitch_broadcaster_id,
+        prefix=settings.twitch_command_prefix,
     )
 
     try:
