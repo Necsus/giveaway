@@ -33,10 +33,13 @@ class GiveawayTwitchBot(commands.AutoBot):
         self._command_handler = command_handler
 
     async def event_message(self, payload: ChatMessage) -> None:
+        login = payload.chatter.name or payload.chatter.id
+        display_name = payload.chatter.display_name or login
+
         author = ChatUser(
             twitch_user_id=payload.chatter.id,
-            login=payload.chatter.name,
-            display_name=payload.chatter.display_name,
+            login=login,
+            display_name=display_name,
         )
 
         await self._command_handler.handle(payload.text, author)
