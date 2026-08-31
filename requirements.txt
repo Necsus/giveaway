@@ -1,2 +1,4 @@
 fastapi==0.141.1
 uvicorn[standard]==0.52.4
+twitchio==3.3.2
+pydantic-settings==2.15.0

@@ -2,7 +2,7 @@
 
 Overlay minimaliste de giveaway pour Twitch, affiché dans OBS comme **source navigateur** et piloté depuis le chat.
 
-> État du projet : socle local fonctionnel. Le moteur, SQLite, FastAPI, le WebSocket et l'overlay minimal sont implémentés. La connexion Twitch, l'administration et le déploiement restent à réaliser.
+> État du projet : socle local fonctionnel. Le moteur, SQLite, FastAPI, le WebSocket, l'overlay minimal, le parseur de commandes et la configuration Twitch typée sont implémentés. La connexion OAuth à Twitch, l'administration et le déploiement restent à réaliser.
 
 ## Objectif
 
@@ -13,6 +13,10 @@ Permettre au streamer de préparer un lot, d'ouvrir les inscriptions, de tirer u
 Le socle suivant est disponible :
 
 - moteur avec les états `HIDDEN`, `WAITING`, `OPEN` et `WINNER` ;
+- parseur des cinq commandes, contrôle du broadcaster par identifiant Twitch et dispatch vers le service ;
+- configuration locale chargée depuis `.env` avec `pydantic-settings` et secret protégé par `SecretStr` ;
+- modèle public `.env.example` contenant uniquement de fausses valeurs ;
+- dépendance TwitchIO 3 installée pour le futur connecteur OAuth ;
 - inscriptions uniques par identifiant Twitch et tirage avec `secrets.choice` ;
 - service applicatif protégé contre les commandes concurrentes par un verrou asynchrone ;
 - historique SQLite des giveaways et des participants ;
@@ -23,8 +27,9 @@ Le socle suivant est disponible :
 
 Restent notamment à réaliser :
 
-- la connexion au chat Twitch et le contrôle des permissions ;
-- la configuration JSON ;
+- l'injection de `Settings` et du gestionnaire de commandes dans le cycle de vie FastAPI ;
+- la connexion OAuth et l'écoute du chat avec TwitchIO ;
+- la future configuration administrable en JSON ;
 - l'authentification et l'interface `/admin` ;
 - la consultation de l'historique ;
 - le déploiement NixOS et la publication privée avec Tailscale.
@@ -115,6 +120,8 @@ Prérequis : Python 3.11 ou plus récent et PowerShell. Le développement actuel
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
+Copy-Item .env.example .env
+# Remplir .env avec les valeurs Twitch réelles, sans le versionner.
 python -m uvicorn app.main:app --reload
 ```
 
@@ -133,6 +140,8 @@ La base locale est créée dans `data/giveaway.sqlite3` et n'est pas versionnée
 ## Sécurité
 
 - Les jetons et secrets Twitch restent côté service et ne sont jamais versionnés.
+- Le fichier `.env` contient les valeurs réelles et ne doit jamais être partagé ; `.env.example` contient uniquement des valeurs fictives.
+- Le secret client Twitch est représenté par `SecretStr` afin d'éviter son affichage accidentel.
 - Les commandes de gestion sont refusées si leur auteur n'est pas le streamer attendu.
 - Le gagnant est choisi côté service, indépendamment d'un éventuel effet visuel ajouté dans OBS.
 

@@ -2,7 +2,7 @@
 
 Plan minimal pour obtenir rapidement un giveaway utilisable dans OBS.
 
-> Avancement actuel : moteur métier, persistance SQLite, restauration au démarrage, API FastAPI, diffusion WebSocket et overlay minimal terminés. Les tests automatisés sont volontairement reportés pour le moment.
+> Avancement actuel : moteur métier, persistance SQLite, restauration au démarrage, API FastAPI, diffusion WebSocket, overlay minimal, parseur de commandes et modèle de configuration `.env` terminés. Les tests automatisés sont volontairement reportés pour le moment.
 
 ## 1. État du giveaway
 
@@ -22,14 +22,20 @@ Plan minimal pour obtenir rapidement un giveaway utilisable dans OBS.
 
 ## 2. Commandes Twitch
 
+- [x] Ajouter TwitchIO 3 aux dépendances du projet.
 - [ ] Écouter les messages d'un seul canal Twitch.
-- [ ] Réserver `!lot`, `!start`, `!pull` et `!stop` au streamer.
-- [ ] Implémenter `!lot <nom du lot>` pour afficher le lot en état `WAITING`.
-- [ ] Implémenter `!start` pour passer à l'état `OPEN`.
-- [ ] Implémenter `!join` pour ajouter le viewer courant.
-- [ ] Implémenter `!pull` pour fermer les inscriptions et afficher le gagnant.
-- [ ] Implémenter `!stop` pour réinitialiser et masquer l'overlay.
-- [ ] Charger les identifiants Twitch depuis le fichier JSON non versionné.
+- [x] Parser les cinq commandes indépendamment du connecteur Twitch.
+- [x] Réserver `!lot`, `!start`, `!pull` et `!stop` au streamer.
+- [x] Implémenter `!lot <nom du lot>` pour afficher le lot en état `WAITING`.
+- [x] Implémenter `!start` pour passer à l'état `OPEN`.
+- [x] Implémenter `!join` pour ajouter le viewer courant.
+- [x] Implémenter `!pull` pour fermer les inscriptions et afficher le gagnant.
+- [x] Implémenter `!stop` pour réinitialiser et masquer l'overlay.
+- [x] Définir les variables Twitch dans `.env.example` avec de fausses valeurs.
+- [x] Charger et typer la configuration locale avec `pydantic-settings`.
+- [x] Protéger le secret client avec `SecretStr`.
+- [ ] Injecter `Settings` et le gestionnaire de commandes dans le cycle de vie FastAPI.
+- [ ] Réaliser l'autorisation OAuth et conserver les tokens Twitch hors de Git.
 
 ### Validation
 
@@ -59,7 +65,8 @@ Plan minimal pour obtenir rapidement un giveaway utilisable dans OBS.
 ## 4. Administration et persistance
 
 - [ ] Ajouter une page `/admin` protégée par authentification.
-- [ ] Lire, valider et écrire la configuration dans un fichier JSON non versionné.
+- [x] Lire et valider la configuration locale Twitch depuis `.env`.
+- [ ] Lire, valider et écrire la future configuration administrable dans un fichier JSON non versionné.
 - [x] Enregistrer les giveaways et leurs participants dans SQLite.
 - [x] Garantir un seul giveaway actif et une seule inscription par utilisateur.
 - [ ] Afficher un historique paginé depuis l'administration.

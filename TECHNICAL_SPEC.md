@@ -15,13 +15,16 @@ Le service reste la source de vérité. OBS affiche l'état reçu mais ne gère 
 Le socle local est actuellement opérationnel :
 
 - moteur d'état et règles des cinq actions métier ;
+- parseur des commandes et contrôle des permissions par identifiant Twitch ;
+- modèle de configuration `.env` typé avec `pydantic-settings` et `SecretStr` ;
+- dépendance TwitchIO 3 installée, connecteur encore à créer ;
 - service applicatif avec verrou asynchrone ;
 - schéma SQLite, persistance des transitions et restauration au démarrage ;
 - FastAPI avec routes de santé, état JSON, overlay et WebSocket ;
 - gestion de plusieurs connexions WebSocket ;
 - overlay HTML/JavaScript sans thème avec reconnexion automatique.
 
-Ne sont pas encore implémentés : le connecteur Twitch, la configuration JSON, l'authentification, `/admin`, les API d'historique, le déploiement NixOS et Tailscale. Les tests automatisés sont reportés ; les contrôles actuels sont manuels et complétés par Ruff et BasedPyright.
+Ne sont pas encore implémentés : l'injection de la configuration dans le cycle de vie FastAPI, le connecteur OAuth Twitch, la configuration administrable en JSON, l'authentification, `/admin`, les API d'historique, le déploiement NixOS et Tailscale. Les tests automatisés sont reportés ; les contrôles actuels sont manuels et complétés par Ruff et BasedPyright.
 
 ## 2. Architecture retenue
 
@@ -52,9 +55,10 @@ Ne sont pas encore implémentés : le connecteur Twitch, la configuration JSON, 
 - **Langage serveur** : Python 3.
 - **Serveur HTTP** : FastAPI avec Uvicorn.
 - **Temps réel** : WebSocket natif de FastAPI.
-- **Accès Twitch** : connecteur Python isolé du reste de l'application, avec TwitchIO comme première option.
+- **Accès Twitch** : connecteur Python isolé du reste de l'application avec TwitchIO 3.
 - **Frontend** : HTML et JavaScript natif, sans framework.
-- **Configuration** : fichier JSON local à la DevBox.
+- **Configuration locale** : `.env` chargé et validé avec `pydantic-settings` ; valeurs réelles jamais versionnées.
+- **Configuration administrable cible** : fichier JSON local à la DevBox.
 - **Historique** : SQLite.
 - **Accès réseau** : Tailscale uniquement.
 - **Déploiement** : service systemd déclaré dans la configuration NixOS.
@@ -92,10 +96,11 @@ Chaque installation OBS peut appliquer son propre **CSS personnalisé**. L'état
 app/
 ├── main.py                 # création de l'application FastAPI
 ├── giveaway.py             # règles et transitions du giveaway
+├── commands.py             # parsing, permissions et dispatch des commandes
 ├── service.py              # coordination moteur, SQLite et WebSocket
-├── twitch.py               # connexion et commandes Twitch, à créer
+├── twitch.py               # connexion OAuth et écoute Twitch, à créer
 ├── websocket.py            # connexions et diffusion de l'état
-├── settings.py             # configuration JSON, à créer
+├── settings.py             # modèle typé de la configuration .env
 ├── database.py             # connexion et initialisation SQLite
 ├── history.py              # persistance et restauration de l'historique
 ├── routes/                 # extraction future des routes de main.py
@@ -108,8 +113,11 @@ app/
 │   └── admin.js            # logique d'administration, à créer
 └── templates/              # à créer uniquement si nécessaire
 
+.env.example                  # modèle versionné avec valeurs fictives
+requirements.txt              # dépendances Python épinglées
+
 data/
-├── settings.json           # configuration non versionnée
+├── settings.json           # future configuration administrable non versionnée
 └── giveaway.sqlite3        # base non versionnée
 ```
 
@@ -260,7 +268,23 @@ Tailscale limite l'accès au réseau privé, mais la page d'administration doit 
 
 Les secrets Twitch sont masqués dans les réponses de l'API. Une valeur secrète vide dans le formulaire signifie « conserver la valeur existante ».
 
-## 10. Configuration JSON
+## 10. Configuration
+
+### Configuration locale actuelle
+
+Le développement local utilise un fichier `.env` à la racine, chargé par `pydantic-settings`. Le modèle `Settings` valide actuellement :
+
+- l'activation du connecteur Twitch ;
+- le Client ID et le Client Secret de l'application Twitch ;
+- les identifiants du bot, du propriétaire et du broadcaster ;
+- les logins du bot et du canal ;
+- le préfixe des commandes, avec `!` par défaut.
+
+Le Client Secret est représenté avec `SecretStr`. Le fichier `.env` réel reste ignoré par Git et ne doit jamais être lu, affiché ou journalisé. `.env.example` documente les noms attendus avec des valeurs fictives. Les access tokens et refresh tokens ne sont pas saisis manuellement à ce stade : ils seront obtenus pendant le parcours OAuth TwitchIO.
+
+Le modèle a été vérifié indépendamment. Son injection dans le cycle de vie FastAPI reste l'étape suivante.
+
+### Configuration JSON cible
 
 Emplacement proposé :
 
@@ -353,12 +377,16 @@ Une contrainte unique sur `(giveaway_id, twitch_user_id)` empêche les doubles i
 
 ## 12. Cycle de démarrage
 
-1. Charger et valider `settings.json`.
-2. Ouvrir SQLite et appliquer les migrations.
-3. Restaurer un éventuel giveaway actif.
-4. Démarrer l'API HTTP et le WebSocket.
-5. Connecter le client Twitch si sa configuration est valide.
-6. Envoyer l'état restauré aux overlays qui se connectent.
+1. Charger et valider les secrets et paramètres Twitch depuis `.env` avec `Settings`.
+2. Charger la future configuration administrable depuis `settings.json` lorsqu'elle sera disponible.
+3. Ouvrir SQLite et appliquer les migrations.
+4. Restaurer un éventuel giveaway actif.
+5. Construire le service et le gestionnaire de commandes.
+6. Démarrer l'API HTTP et le WebSocket.
+7. Connecter le client Twitch si sa configuration est activée et valide.
+8. Envoyer l'état restauré aux overlays qui se connectent.
+
+État actuel : les étapes SQLite, restauration, service, API et WebSocket sont en place. Le modèle `Settings` est validé séparément mais n'est pas encore injecté dans ce cycle de démarrage.
 
 Si Twitch est indisponible, l'administration et l'historique doivent rester accessibles. Le service tente une reconnexion avec un délai progressif plafonné.
 
@@ -409,7 +437,8 @@ Les tests automatisés décrits ci-dessous restent l'objectif avant la fin du MV
 - double `!join` ;
 - `!pull` avec 0, 1 et plusieurs participants ;
 - unicité et conservation du gagnant ;
-- validation et écriture atomique du JSON.
+- chargement et validation de `.env` sans exposition des secrets ;
+- validation et écriture atomique du futur JSON administrable.
 
 ### Tests d'intégration
 
@@ -438,9 +467,11 @@ Les tests automatisés décrits ci-dessous restent l'objectif avant la fin du MV
 2. [x] Base SQLite et restauration de l'état, hors migrations versionnées et WAL.
 3. [x] API FastAPI et WebSocket de l'overlay.
 4. [x] Overlay HTML/JavaScript minimal.
-5. [ ] Connexion au chat Twitch.
-6. [ ] Configuration JSON et validation.
-7. [ ] Authentification et interface `/admin`.
-8. [ ] Consultation de l'historique.
-9. [ ] Déploiement NixOS et publication Tailscale.
-10. [ ] Tests automatisés et essais depuis plusieurs PC et plusieurs sources OBS.
+5. [x] Parseur de commandes et configuration locale `.env` typée.
+6. [x] Dépendances TwitchIO et `pydantic-settings` épinglées.
+7. [ ] Injection de `Settings` dans le cycle de vie FastAPI.
+8. [ ] Autorisation OAuth et connexion au chat Twitch.
+9. [ ] Configuration JSON, authentification et interface `/admin`.
+10. [ ] Consultation de l'historique.
+11. [ ] Déploiement NixOS et publication Tailscale.
+12. [ ] Tests automatisés et essais depuis plusieurs PC et plusieurs sources OBS.
