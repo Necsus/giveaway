@@ -6,13 +6,13 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
+from app.commands import GiveawayCommandHandler
 from app.database import connect_database, initialize_database
 from app.giveaway import GiveawayEngine
 from app.history import restore_active_giveaway
 from app.service import GiveawayService
-from app.websocket import OverlayConnectionManager
 from app.settings import Settings
-from app.commands import GiveawayCommandHandler
+from app.websocket import OverlayConnectionManager
 
 STATIC_DIRECTORY = Path(__file__).parent / "static"
 
