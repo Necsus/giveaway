@@ -10,6 +10,19 @@ Construire un service central de giveaway Twitch hébergé sur la DevBox. Tous l
 
 Le service reste la source de vérité. OBS affiche l'état reçu mais ne gère ni les commandes Twitch, ni les permissions, ni le tirage.
 
+### État d'implémentation
+
+Le socle local est actuellement opérationnel :
+
+- moteur d'état et règles des cinq actions métier ;
+- service applicatif avec verrou asynchrone ;
+- schéma SQLite, persistance des transitions et restauration au démarrage ;
+- FastAPI avec routes de santé, état JSON, overlay et WebSocket ;
+- gestion de plusieurs connexions WebSocket ;
+- overlay HTML/JavaScript sans thème avec reconnexion automatique.
+
+Ne sont pas encore implémentés : le connecteur Twitch, la configuration JSON, l'authentification, `/admin`, les API d'historique, le déploiement NixOS et Tailscale. Les tests automatisés sont reportés ; les contrôles actuels sont manuels et complétés par Ruff et BasedPyright.
+
 ## 2. Architecture retenue
 
 ```text
@@ -79,20 +92,21 @@ Chaque installation OBS peut appliquer son propre **CSS personnalisé**. L'état
 app/
 ├── main.py                 # création de l'application FastAPI
 ├── giveaway.py             # règles et transitions du giveaway
-├── twitch.py               # connexion et commandes Twitch
+├── service.py              # coordination moteur, SQLite et WebSocket
+├── twitch.py               # connexion et commandes Twitch, à créer
 ├── websocket.py            # connexions et diffusion de l'état
-├── settings.py             # lecture, validation et écriture du JSON
-├── database.py             # connexion SQLite et migrations
-├── history.py              # enregistrement et lecture de l'historique
-├── routes/
-│   ├── overlay.py          # page et WebSocket de l'overlay
-│   └── admin.py            # administration et API protégée
+├── settings.py             # configuration JSON, à créer
+├── database.py             # connexion et initialisation SQLite
+├── history.py              # persistance et restauration de l'historique
+├── routes/                 # extraction future des routes de main.py
+│   ├── overlay.py          # page et WebSocket de l'overlay, à créer
+│   └── admin.py            # administration protégée, à créer
 ├── static/
 │   ├── overlay.html        # squelette de l'overlay
 │   ├── overlay.js          # réception et rendu de l'état
-│   ├── admin.html          # interface d'administration
-│   └── admin.js
-└── templates/              # uniquement si nécessaire
+│   ├── admin.html          # interface d'administration, à créer
+│   └── admin.js            # logique d'administration, à créer
+└── templates/              # à créer uniquement si nécessaire
 
 data/
 ├── settings.json           # configuration non versionnée
@@ -322,7 +336,7 @@ Emplacement proposé :
 | `display_name` | TEXT | Nom affiché au moment de l'inscription. |
 | `joined_at` | TEXT | Date UTC du `!join`. |
 
-Une contrainte unique sur `(giveaway_id, twitch_user_id)` empêche les doubles inscriptions au niveau de la base.
+Une contrainte unique sur `(giveaway_id, twitch_user_id)` empêche les doubles inscriptions au niveau de la base. Un index unique partiel garantit également qu'une seule ligne peut avoir le statut `WAITING`, `OPEN` ou `WINNER`.
 
 ### Utilisation
 
@@ -334,6 +348,8 @@ Une contrainte unique sur `(giveaway_id, twitch_user_id)` empêche les doubles i
 - `!pull` enregistre le statut `WINNER` tant que le résultat reste affiché ;
 - `!stop` transforme `WINNER` en `COMPLETED`, ou `WAITING`/`OPEN` en `CANCELLED`, puis masque l'overlay sans supprimer l'historique ;
 - les migrations de schéma sont versionnées et exécutées au démarrage.
+
+État actuel : les clés étrangères, les contraintes d'unicité, les dates UTC, l'enregistrement des transitions et la restauration sont implémentés. Le schéma est créé avec des instructions idempotentes `CREATE ... IF NOT EXISTS`. Le mode WAL et les migrations versionnées restent à ajouter avant le déploiement.
 
 ## 12. Cycle de démarrage
 
@@ -382,6 +398,8 @@ Ils ne doivent jamais contenir :
 
 ## 15. Tests minimaux
 
+Les tests automatisés décrits ci-dessous restent l'objectif avant la fin du MVP, mais leur mise en place est volontairement reportée. Les contrôles actuellement exécutés sont : compilation Python, Ruff, BasedPyright et scénarios manuels en mémoire ou avec SQLite.
+
 ### Tests unitaires
 
 - transitions entre les quatre états ;
@@ -416,13 +434,13 @@ Ils ne doivent jamais contenir :
 
 ## 16. Ordre d'implémentation
 
-1. Moteur d'état et tests unitaires.
-2. Base SQLite et restauration de l'état.
-3. API FastAPI et WebSocket.
-4. Overlay HTML/JavaScript minimal.
-5. Connexion au chat Twitch.
-6. Configuration JSON et validation.
-7. Authentification et interface `/admin`.
-8. Consultation de l'historique.
-9. Déploiement NixOS et publication Tailscale.
-10. Tests depuis plusieurs PC et plusieurs sources OBS.
+1. [x] Moteur d'état, hors tests automatisés reportés.
+2. [x] Base SQLite et restauration de l'état, hors migrations versionnées et WAL.
+3. [x] API FastAPI et WebSocket de l'overlay.
+4. [x] Overlay HTML/JavaScript minimal.
+5. [ ] Connexion au chat Twitch.
+6. [ ] Configuration JSON et validation.
+7. [ ] Authentification et interface `/admin`.
+8. [ ] Consultation de l'historique.
+9. [ ] Déploiement NixOS et publication Tailscale.
+10. [ ] Tests automatisés et essais depuis plusieurs PC et plusieurs sources OBS.

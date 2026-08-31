@@ -2,11 +2,34 @@
 
 Overlay minimaliste de giveaway pour Twitch, affiché dans OBS comme **source navigateur** et piloté depuis le chat.
 
-> État du projet : conception initiale. L'application n'est pas encore fonctionnelle.
+> État du projet : socle local fonctionnel. Le moteur, SQLite, FastAPI, le WebSocket et l'overlay minimal sont implémentés. La connexion Twitch, l'administration et le déploiement restent à réaliser.
 
 ## Objectif
 
 Permettre au streamer de préparer un lot, d'ouvrir les inscriptions, de tirer un gagnant puis de masquer l'overlay, uniquement avec des commandes Twitch.
+
+## État actuel
+
+Le socle suivant est disponible :
+
+- moteur avec les états `HIDDEN`, `WAITING`, `OPEN` et `WINNER` ;
+- inscriptions uniques par identifiant Twitch et tirage avec `secrets.choice` ;
+- service applicatif protégé contre les commandes concurrentes par un verrou asynchrone ;
+- historique SQLite des giveaways et des participants ;
+- restauration d'un giveaway actif après un redémarrage ;
+- API FastAPI avec `/health`, `/api/state`, `/overlay` et `/ws/overlay` ;
+- overlay HTML/JavaScript minimal, mise à jour par WebSocket et reconnexion automatique ;
+- prise en charge simultanée de plusieurs connexions d'overlay.
+
+Restent notamment à réaliser :
+
+- la connexion au chat Twitch et le contrôle des permissions ;
+- la configuration JSON ;
+- l'authentification et l'interface `/admin` ;
+- la consultation de l'historique ;
+- le déploiement NixOS et la publication privée avec Tailscale.
+
+Aucune route non authentifiée ne permet actuellement de piloter le giveaway. Tant que le connecteur Twitch n'est pas ajouté, l'overlay reçoit donc son état initial mais aucun utilisateur ne peut déclencher les commandes depuis le chat.
 
 ## Commandes
 
@@ -83,6 +106,29 @@ Le service est la source de vérité. L'overlay affiche uniquement l'état reçu
 - enregistrer l'historique des giveaways dans SQLite.
 
 Ne font pas partie du MVP : les avatars Twitch, les thèmes intégrés, les sons, la gestion de plusieurs chaînes et la pondération des chances.
+
+## Développement local
+
+Prérequis : Python 3.11 ou plus récent et PowerShell. Le développement actuel utilise Python 3.13.
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
+python -m uvicorn app.main:app --reload
+```
+
+Le service local est ensuite disponible sur :
+
+| URL | Usage |
+|---|---|
+| `http://127.0.0.1:8000/health` | État de santé du service. |
+| `http://127.0.0.1:8000/api/state` | Instantané JSON du giveaway courant. |
+| `http://127.0.0.1:8000/overlay` | Page destinée à la source navigateur OBS. |
+| `http://127.0.0.1:8000/docs` | Documentation OpenAPI générée par FastAPI. |
+| `ws://127.0.0.1:8000/ws/overlay` | WebSocket utilisé par l'overlay. |
+
+La base locale est créée dans `data/giveaway.sqlite3` et n'est pas versionnée. Les dates sont stockées en UTC ; l'administration les affichera plus tard dans le fuseau `Europe/Paris`.
 
 ## Sécurité
 

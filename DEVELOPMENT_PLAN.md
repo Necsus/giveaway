@@ -2,12 +2,16 @@
 
 Plan minimal pour obtenir rapidement un giveaway utilisable dans OBS.
 
+> Avancement actuel : moteur métier, persistance SQLite, restauration au démarrage, API FastAPI, diffusion WebSocket et overlay minimal terminés. Les tests automatisés sont volontairement reportés pour le moment.
+
 ## 1. État du giveaway
 
-- [ ] Définir les états : `HIDDEN`, `WAITING`, `OPEN` et `WINNER`.
-- [ ] Conserver le nom du lot, les participants et le gagnant.
-- [ ] Empêcher plusieurs inscriptions avec le même identifiant Twitch.
-- [ ] Choisir le gagnant au hasard côté service.
+- [x] Définir les états : `HIDDEN`, `WAITING`, `OPEN` et `WINNER`.
+- [x] Conserver le nom du lot, les participants et le gagnant.
+- [x] Empêcher plusieurs inscriptions avec le même identifiant Twitch.
+- [x] Choisir le gagnant au hasard côté service.
+- [x] Coordonner les transitions, SQLite et les diffusions WebSocket dans un service applicatif.
+- [x] Protéger les commandes concurrentes avec un verrou asynchrone.
 
 ### Validation
 
@@ -35,12 +39,13 @@ Plan minimal pour obtenir rapidement un giveaway utilisable dans OBS.
 
 ## 3. Overlay OBS
 
-- [ ] Servir une page HTML utilisable comme source navigateur OBS.
-- [ ] Créer un squelette HTML avec des `id` stables : `giveaway`, `lot`, `status`, `participants` et `winner`.
-- [ ] Afficher ou masquer le conteneur selon l'état reçu.
-- [ ] Synchroniser l'overlay avec le service, par exemple avec WebSocket.
-- [ ] Renvoyer l'état complet lorsque la source OBS se reconnecte.
-- [ ] Laisser toute la personnalisation visuelle au CSS personnalisé d'OBS.
+- [x] Servir une page HTML utilisable comme source navigateur OBS.
+- [x] Créer un squelette HTML avec des `id` stables : `giveaway`, `lot`, `status`, `participants` et `winner`.
+- [x] Afficher ou masquer le conteneur selon l'état reçu.
+- [x] Synchroniser l'overlay avec le service avec WebSocket.
+- [x] Renvoyer l'état complet lorsque la source OBS se reconnecte.
+- [x] Reconnecter automatiquement le JavaScript après une coupure.
+- [x] Laisser toute la personnalisation visuelle au CSS personnalisé d'OBS.
 
 ### Validation
 
@@ -55,9 +60,10 @@ Plan minimal pour obtenir rapidement un giveaway utilisable dans OBS.
 
 - [ ] Ajouter une page `/admin` protégée par authentification.
 - [ ] Lire, valider et écrire la configuration dans un fichier JSON non versionné.
-- [ ] Enregistrer les giveaways et leurs participants dans SQLite.
+- [x] Enregistrer les giveaways et leurs participants dans SQLite.
+- [x] Garantir un seul giveaway actif et une seule inscription par utilisateur.
 - [ ] Afficher un historique paginé depuis l'administration.
-- [ ] Restaurer un giveaway actif après le redémarrage du service.
+- [x] Restaurer un giveaway actif après le redémarrage du service.
 - [ ] Déployer le service Python sur la DevBox et le publier uniquement dans le tailnet.
 
 ### Validation
@@ -69,7 +75,10 @@ Plan minimal pour obtenir rapidement un giveaway utilisable dans OBS.
 
 ## 5. Vérification finale
 
-- [ ] Tester le parcours `!lot` → `!start` → `!join` → `!pull` → `!stop`.
+Contrôles techniques déjà effectués manuellement : compilation Python, Ruff, BasedPyright, cycle métier avec SQLite, restauration des états `WAITING`, `OPEN` et `WINNER`, unicité des inscriptions et unicité du giveaway actif.
+
+- [ ] Ajouter les tests automatisés lorsqu'ils seront réintroduits dans le périmètre.
+- [ ] Tester le parcours Twitch `!lot` → `!start` → `!join` → `!pull` → `!stop`.
 - [ ] Tester les commandes reçues dans le mauvais ordre.
 - [ ] Tester 0, 1 et plusieurs participants.
 - [ ] Tester une double inscription.
