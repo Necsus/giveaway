@@ -22,7 +22,7 @@ overlay_connections = OverlayConnectionManager()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
-    settings = Settings()
+    settings = Settings()  # pyright: ignore[reportCallIssue]
 
     connection = connect_database()
     initialize_database(connection)
