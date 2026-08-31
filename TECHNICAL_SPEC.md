@@ -17,14 +17,15 @@ Le socle local est actuellement opérationnel :
 - moteur d'état et règles des cinq actions métier ;
 - parseur des commandes et contrôle des permissions par identifiant Twitch ;
 - modèle de configuration `.env` typé avec `pydantic-settings` et `SecretStr` ;
-- dépendance TwitchIO 3 installée, connecteur encore à créer ;
+- connecteur TwitchIO 3 avec OAuth, abonnement EventSub et écoute du chat ;
+- injection de la configuration et du connecteur dans le cycle de vie FastAPI ;
 - service applicatif avec verrou asynchrone ;
 - schéma SQLite, persistance des transitions et restauration au démarrage ;
 - FastAPI avec routes de santé, état JSON, overlay et WebSocket ;
 - gestion de plusieurs connexions WebSocket ;
 - overlay HTML/JavaScript sans thème avec reconnexion automatique.
 
-Ne sont pas encore implémentés : l'injection de la configuration dans le cycle de vie FastAPI, le connecteur OAuth Twitch, la configuration administrable en JSON, l'authentification, `/admin`, les API d'historique, le déploiement NixOS et Tailscale. Les tests automatisés sont reportés ; les contrôles actuels sont manuels et complétés par Ruff et BasedPyright.
+Ne sont pas encore implémentés : la configuration administrable en JSON, l'authentification, `/admin`, les API d'historique, le déploiement NixOS et Tailscale. L'arrêt doit encore être fiabilisé afin d'éviter l'interaction entre les gestionnaires de signaux de l'adaptateur OAuth TwitchIO et d'Uvicorn. Les tests automatisés sont reportés ; les contrôles actuels sont manuels et complétés par Ruff et BasedPyright.
 
 ## 2. Architecture retenue
 
@@ -98,7 +99,7 @@ app/
 ├── giveaway.py             # règles et transitions du giveaway
 ├── commands.py             # parsing, permissions et dispatch des commandes
 ├── service.py              # coordination moteur, SQLite et WebSocket
-├── twitch.py               # connexion OAuth et écoute Twitch, à créer
+├── twitch.py               # connexion OAuth, abonnement EventSub et écoute Twitch
 ├── websocket.py            # connexions et diffusion de l'état
 ├── settings.py             # modèle typé de la configuration .env
 ├── database.py             # connexion et initialisation SQLite
@@ -280,9 +281,9 @@ Le développement local utilise un fichier `.env` à la racine, chargé par `pyd
 - les logins du bot et du canal ;
 - le préfixe des commandes, avec `!` par défaut.
 
-Le Client Secret est représenté avec `SecretStr`. Le fichier `.env` réel reste ignoré par Git et ne doit jamais être lu, affiché ou journalisé. `.env.example` documente les noms attendus avec des valeurs fictives. Les access tokens et refresh tokens ne sont pas saisis manuellement à ce stade : ils seront obtenus pendant le parcours OAuth TwitchIO.
+Le Client Secret est représenté avec `SecretStr`. Le fichier `.env` réel reste ignoré par Git et ne doit jamais être lu, affiché ou journalisé. `.env.example` documente les noms attendus avec des valeurs fictives. Les access tokens et refresh tokens ne sont pas saisis manuellement : ils sont obtenus pendant le parcours OAuth TwitchIO, sauvegardés dans `.tio.tokens.json` et rechargés au démarrage. Ce fichier est ignoré par Git et ne doit jamais être lu, affiché ou partagé.
 
-Le modèle a été vérifié indépendamment. Son injection dans le cycle de vie FastAPI reste l'étape suivante.
+`Settings`, le gestionnaire de commandes et le connecteur TwitchIO sont créés dans le cycle de vie FastAPI. Le connecteur démarre uniquement lorsque `TWITCH_ENABLED` est actif. Pour le développement distant, l'adaptateur OAuth écoute sur `localhost:4343` et peut être transmis avec un tunnel SSH. L'application Twitch déclare `http://localhost:4343/oauth/callback` comme URL de redirection.
 
 ### Configuration JSON cible
 
@@ -469,8 +470,8 @@ Les tests automatisés décrits ci-dessous restent l'objectif avant la fin du MV
 4. [x] Overlay HTML/JavaScript minimal.
 5. [x] Parseur de commandes et configuration locale `.env` typée.
 6. [x] Dépendances TwitchIO et `pydantic-settings` épinglées.
-7. [ ] Injection de `Settings` dans le cycle de vie FastAPI.
-8. [ ] Autorisation OAuth et connexion au chat Twitch.
+7. [x] Injection de `Settings` dans le cycle de vie FastAPI.
+8. [x] Autorisation OAuth et connexion au chat Twitch.
 9. [ ] Configuration JSON, authentification et interface `/admin`.
 10. [ ] Consultation de l'historique.
 11. [ ] Déploiement NixOS et publication Tailscale.

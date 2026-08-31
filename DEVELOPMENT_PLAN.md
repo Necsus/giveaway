@@ -2,7 +2,7 @@
 
 Plan minimal pour obtenir rapidement un giveaway utilisable dans OBS.
 
-> Avancement actuel : moteur métier, persistance SQLite, restauration au démarrage, API FastAPI, diffusion WebSocket, overlay minimal, parseur de commandes et modèle de configuration `.env` terminés. Les tests automatisés sont volontairement reportés pour le moment.
+> Avancement actuel : moteur métier, persistance SQLite, restauration au démarrage, API FastAPI, diffusion WebSocket, overlay minimal et pilotage depuis le chat Twitch avec OAuth terminés. Les tests automatisés sont volontairement reportés pour le moment.
 
 ## 1. État du giveaway
 
@@ -23,7 +23,7 @@ Plan minimal pour obtenir rapidement un giveaway utilisable dans OBS.
 ## 2. Commandes Twitch
 
 - [x] Ajouter TwitchIO 3 aux dépendances du projet.
-- [ ] Écouter les messages d'un seul canal Twitch.
+- [x] Écouter les messages d'un seul canal Twitch.
 - [x] Parser les cinq commandes indépendamment du connecteur Twitch.
 - [x] Réserver `!lot`, `!start`, `!pull` et `!stop` au streamer.
 - [x] Implémenter `!lot <nom du lot>` pour afficher le lot en état `WAITING`.
@@ -34,8 +34,9 @@ Plan minimal pour obtenir rapidement un giveaway utilisable dans OBS.
 - [x] Définir les variables Twitch dans `.env.example` avec de fausses valeurs.
 - [x] Charger et typer la configuration locale avec `pydantic-settings`.
 - [x] Protéger le secret client avec `SecretStr`.
-- [ ] Injecter `Settings` et le gestionnaire de commandes dans le cycle de vie FastAPI.
-- [ ] Réaliser l'autorisation OAuth et conserver les tokens Twitch hors de Git.
+- [x] Injecter `Settings`, le gestionnaire de commandes et le connecteur Twitch dans le cycle de vie FastAPI.
+- [x] Réaliser l'autorisation OAuth et conserver les tokens Twitch hors de Git.
+- [ ] Corriger l'interaction des gestionnaires de signaux de l'adaptateur OAuth TwitchIO et d'Uvicorn lors de l'arrêt.
 
 ### Validation
 
@@ -85,7 +86,7 @@ Plan minimal pour obtenir rapidement un giveaway utilisable dans OBS.
 Contrôles techniques déjà effectués manuellement : compilation Python, Ruff, BasedPyright, cycle métier avec SQLite, restauration des états `WAITING`, `OPEN` et `WINNER`, unicité des inscriptions et unicité du giveaway actif.
 
 - [ ] Ajouter les tests automatisés lorsqu'ils seront réintroduits dans le périmètre.
-- [ ] Tester le parcours Twitch `!lot` → `!start` → `!join` → `!pull` → `!stop`.
+- [x] Tester manuellement le parcours Twitch `!lot` → `!start` → `!join` → `!pull` → `!stop`.
 - [ ] Tester les commandes reçues dans le mauvais ordre.
 - [ ] Tester 0, 1 et plusieurs participants.
 - [ ] Tester une double inscription.

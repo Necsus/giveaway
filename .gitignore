@@ -39,3 +39,6 @@ data/*.sqlite3-*
 .vscode/
 .DS_Store
 Thumbs.db
+
+# TwitchIO OAuth tokens
+.tio.tokens.json
