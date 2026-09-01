@@ -1,108 +1,140 @@
 # Plan de développement
 
-Plan minimal pour obtenir rapidement un giveaway utilisable dans OBS.
+Plan pour faire évoluer le giveaway mono-streamer actuel vers un service multi-streamer utilisable simultanément depuis plusieurs chaînes Twitch.
 
-> Avancement actuel : moteur métier, persistance SQLite, restauration au démarrage, API FastAPI, diffusion WebSocket, overlay minimal et pilotage depuis le chat Twitch avec OAuth terminés. Les tests automatisés sont volontairement reportés pour le moment.
+> Avancement actuel : le parcours complet fonctionne pour un streamer avec FastAPI, TwitchIO, OAuth, SQLite, WebSocket et OBS. La cible multi-streamer décrite ci-dessous n'est pas encore implémentée.
 
-## 1. État du giveaway
+## 1. Socle mono-streamer terminé
 
-- [x] Définir les états : `HIDDEN`, `WAITING`, `OPEN` et `WINNER`.
-- [x] Conserver le nom du lot, les participants et le gagnant.
-- [x] Empêcher plusieurs inscriptions avec le même identifiant Twitch.
-- [x] Choisir le gagnant au hasard côté service.
-- [x] Coordonner les transitions, SQLite et les diffusions WebSocket dans un service applicatif.
-- [x] Protéger les commandes concurrentes avec un verrou asynchrone.
+- [x] Définir les états `HIDDEN`, `WAITING`, `OPEN` et `WINNER`.
+- [x] Gérer `!lot`, `!start`, `!join`, `!pull` et `!stop`.
+- [x] Réserver les commandes de gestion au broadcaster.
+- [x] Empêcher les doubles inscriptions.
+- [x] Choisir le gagnant côté serveur avec `secrets.choice`.
+- [x] Persister et restaurer l'état avec SQLite.
+- [x] Synchroniser plusieurs overlays avec WebSocket.
+- [x] Connecter TwitchIO avec OAuth et EventSub.
+- [x] Charger les secrets depuis `.env`.
+- [x] Valider et écrire atomiquement `settings.json`.
+- [x] Injecter la configuration dans le cycle de vie FastAPI.
+- [x] Tester manuellement le parcours Twitch complet dans OBS.
 
-### Validation
+## 2. Stabilisation sous charge
 
-- `!join` n'est accepté que dans l'état `OPEN`.
-- Un viewer ne peut apparaître qu'une fois.
-- `!pull` sans participant ne choisit aucun gagnant.
-- `!stop` réinitialise l'état actif et masque l'overlay sans supprimer l'historique.
+- [ ] Retirer la liste complète des participants des événements WebSocket de l'overlay.
+- [ ] Exposer les participants uniquement dans une API administrative paginée.
+- [ ] Sortir les diffusions WebSocket du verrou métier.
+- [ ] Utiliser une file bornée par streamer qui conserve uniquement l'état le plus récent.
+- [ ] Envoyer aux overlays en parallèle avec un délai maximal par connexion.
+- [ ] Déconnecter les clients trop lents ou défaillants.
+- [ ] Remplacer la liste de participants en mémoire par une structure indexée par identifiant Twitch.
+- [ ] Passer SQLite en mode WAL avec `busy_timeout`.
+- [ ] Retirer les écritures SQLite synchrones de la boucle événementielle.
+- [ ] Garantir la cohérence entre l'état mémoire et SQLite lors d'un échec.
+- [ ] Superviser la tâche TwitchIO et ajouter une reconnexion progressive.
+- [ ] Distinguer les contrôles de santé `live` et `ready`.
+- [ ] Ajouter un backoff exponentiel avec jitter à la reconnexion de l'overlay.
+- [ ] Limiter la taille et le nombre des connexions WebSocket.
+- [ ] Configurer `LimitNOFILE=65536` dans le futur service NixOS.
+- [ ] Désactiver ou réduire les access logs en production.
 
-## 2. Commandes Twitch
+### Validation de charge
 
-- [x] Ajouter TwitchIO 3 aux dépendances du projet.
-- [x] Écouter les messages d'un seul canal Twitch.
-- [x] Parser les cinq commandes indépendamment du connecteur Twitch.
-- [x] Réserver `!lot`, `!start`, `!pull` et `!stop` au streamer.
-- [x] Implémenter `!lot <nom du lot>` pour afficher le lot en état `WAITING`.
-- [x] Implémenter `!start` pour passer à l'état `OPEN`.
-- [x] Implémenter `!join` pour ajouter le viewer courant.
-- [x] Implémenter `!pull` pour fermer les inscriptions et afficher le gagnant.
-- [x] Implémenter `!stop` pour réinitialiser et masquer l'overlay.
-- [x] Définir les variables Twitch dans `.env.example` avec de fausses valeurs.
-- [x] Charger et typer la configuration locale avec `pydantic-settings`.
-- [x] Protéger le secret client avec `SecretStr`.
-- [x] Injecter `Settings`, le gestionnaire de commandes et le connecteur Twitch dans le cycle de vie FastAPI.
-- [x] Réaliser l'autorisation OAuth et conserver les tokens Twitch hors de Git.
-- [x] Désactiver l'adaptateur OAuth hors des autorisations afin de garantir l'arrêt propre avec Uvicorn.
+- 10 000 participants ne font pas grossir le message d'overlay au-delà de quelques Kio.
+- Un overlay lent ne retarde ni une commande Twitch ni les autres overlays.
+- 500 connexions WebSocket simultanées restent stables sans fuite de descripteurs.
+- Une erreur SQLite ne laisse jamais l'état mémoire diverger de la base.
+- La perte de TwitchIO est visible dans `ready` et déclenche une reconnexion.
+- Le service fonctionne avec un seul worker Uvicorn tant que l'état reste en mémoire.
 
-### Validation
+## 3. Modèle multi-streamer
 
-- Un viewer ne peut pas exécuter une commande réservée au streamer.
-- Les commandes produisent uniquement les transitions prévues.
-- Aucun secret Twitch n'est envoyé au navigateur ni ajouté au dépôt.
-
-## 3. Overlay OBS
-
-- [x] Servir une page HTML utilisable comme source navigateur OBS.
-- [x] Créer un squelette HTML avec des `id` stables : `giveaway`, `lot`, `status`, `participants` et `winner`.
-- [x] Afficher ou masquer le conteneur selon l'état reçu.
-- [x] Synchroniser l'overlay avec le service avec WebSocket.
-- [x] Renvoyer l'état complet lorsque la source OBS se reconnecte.
-- [x] Reconnecter automatiquement le JavaScript après une coupure.
-- [x] Laisser toute la personnalisation visuelle au CSS personnalisé d'OBS.
-
-### Validation
-
-- `!lot test` affiche l'overlay avec le texte `test`.
-- `!start` indique que les inscriptions sont ouvertes.
-- Chaque `!join` valide met à jour les participants.
-- `!pull` affiche un unique gagnant.
-- `!stop` masque entièrement l'overlay.
-- Le rechargement de la source OBS récupère l'état courant.
-
-## 4. Administration et persistance
-
-- [ ] Ajouter une page `/admin` protégée par authentification.
-- [x] Lire et valider la configuration locale Twitch depuis `.env`.
-- [ ] Lire, valider et écrire la future configuration administrable dans un fichier JSON non versionné.
-- [x] Enregistrer les giveaways et leurs participants dans SQLite.
-- [x] Garantir un seul giveaway actif et une seule inscription par utilisateur.
-- [ ] Afficher un historique paginé depuis l'administration.
-- [x] Restaurer un giveaway actif après le redémarrage du service.
-- [ ] Déployer le service Python sur la DevBox et le publier uniquement dans le tailnet.
+- [ ] Ajouter une table `streamers` indexée par identifiant Twitch.
+- [ ] Ajouter `broadcaster_id` aux giveaways existants.
+- [ ] Rattacher l'historique actuel au streamer de bootstrap sans perte de données.
+- [ ] Remplacer l'unicité globale par un giveaway actif maximum par streamer.
+- [ ] Ajouter des migrations SQLite versionnées.
+- [ ] Déplacer les réglages propres aux streamers du JSON vers SQLite.
+- [ ] Limiter le JSON aux réglages globaux non secrets du bot dédié.
 
 ### Validation
 
-- La configuration peut être modifiée depuis un PC autorisé.
-- Les secrets ne sont jamais renvoyés en clair ni ajoutés au dépôt.
-- Un giveaway terminé ou annulé reste consultable dans l'historique.
-- Plusieurs PC peuvent charger le même overlay et recevoir le même état.
+- Deux streamers peuvent avoir chacun un giveaway actif.
+- Les participants et gagnants restent rattachés au bon streamer.
+- Une migration conserve l'historique mono-streamer existant.
+- Un JSON ou une migration invalide n'écrase aucune donnée valide.
 
-## 5. Vérification finale
+## 4. Runtimes et overlays isolés
 
-Contrôles techniques déjà effectués manuellement : compilation Python, Ruff, BasedPyright, cycle métier avec SQLite, restauration des états `WAITING`, `OPEN` et `WINNER`, unicité des inscriptions et unicité du giveaway actif.
+- [ ] Créer un registre de moteurs et services indexé par identifiant Twitch.
+- [ ] Restaurer un moteur actif par streamer au démarrage.
+- [ ] Séparer les connexions WebSocket par streamer.
+- [ ] Exposer `/overlay/{login_twitch}`.
+- [ ] Exposer `/ws/overlay/{login_twitch}`.
+- [ ] Résoudre le login vers l'identifiant Twitch stable.
+- [ ] Actualiser le login après chaque authentification Twitch.
 
-- [ ] Ajouter les tests automatisés lorsqu'ils seront réintroduits dans le périmètre.
-- [x] Tester manuellement le parcours Twitch `!lot` → `!start` → `!join` → `!pull` → `!stop`.
-- [ ] Tester les commandes reçues dans le mauvais ordre.
-- [ ] Tester 0, 1 et plusieurs participants.
-- [ ] Tester une double inscription.
-- [ ] Tester le rechargement de l'overlay.
-- [ ] Tester la configuration et l'historique depuis `/admin`.
-- [ ] Documenter le lancement du service et l'ajout de la source dans OBS.
+### Validation
 
-## MVP terminé
+- Une commande reçue sur la chaîne A ne modifie jamais l'état B.
+- `/overlay/a` et `/overlay/b` affichent des giveaways indépendants.
+- Plusieurs OBS peuvent suivre le même streamer.
+- Un changement de login produit une nouvelle URL sans mélanger l'historique.
 
-Le MVP est terminé lorsque le scénario suivant fonctionne sans modifier le code :
+## 5. Bot global et EventSub multi-canaux
 
-1. Le service Python démarre sur la DevBox et se connecte au canal Twitch configuré depuis `/admin`.
-2. Les PC autorisés chargent l'overlay dans OBS via Tailscale, initialement masqué.
-3. Le streamer envoie `!lot Clavier mécanique` : le lot apparaît en attente.
-4. Le streamer envoie `!start` : les inscriptions ouvrent.
-5. Les viewers s'inscrivent une seule fois avec `!join`.
-6. Le streamer envoie `!pull` : un gagnant est choisi et affiché.
-7. Le streamer envoie `!stop` : l'état actif est réinitialisé et l'overlay disparaît.
-8. Le giveaway et ses participants restent consultables dans l'historique SQLite.
+- [ ] Utiliser une application Twitch globale : Client ID et Client Secret ne représentent aucun compte utilisateur.
+- [ ] Autoriser une seule fois un compte bot dédié avec `user:read:chat`, `user:write:chat` et `user:bot`.
+- [ ] Autoriser chaque streamer avec `channel:bot`.
+- [ ] Créer et supprimer dynamiquement les abonnements EventSub par streamer.
+- [ ] Restaurer les abonnements des streamers actifs au redémarrage.
+- [ ] Gérer les révocations et reconnexions sans arrêter FastAPI.
+
+### Validation
+
+- Le même bot reçoit les messages de plusieurs chaînes.
+- Une révocation désactive uniquement le streamer concerné.
+- Aucun token OAuth n'est stocké dans SQLite ou envoyé au navigateur.
+
+## 6. Administration avec Twitch OAuth
+
+- [ ] Ajouter un bouton **Se connecter avec Twitch** sur `/admin`.
+- [ ] Implémenter `/auth/twitch/login` et `/auth/twitch/callback`.
+- [ ] Utiliser un état OAuth aléatoire, court et à usage unique.
+- [ ] Créer une session signée dans un cookie `HttpOnly`, `Secure` et `SameSite=Lax`.
+- [ ] Ajouter la déconnexion et l'expiration de session.
+- [ ] Autoriser la création d'un espace à tout membre ayant déjà accès au tailnet.
+- [ ] Ne jamais accepter un `broadcaster_id` fourni par le navigateur comme identité.
+- [ ] Permettre au streamer de modifier son préfixe et l'activation de son espace.
+
+### Validation
+
+- Un utilisateur non connecté ne peut pas appeler `/api/admin/*`.
+- Le callback refuse un état OAuth absent, expiré ou déjà utilisé.
+- La session contient l'identifiant Twitch validé côté serveur.
+- Le login et le nom affiché sont actualisés à chaque connexion.
+
+## 7. Historique isolé
+
+- [ ] Paginer l'historique du streamer connecté.
+- [ ] Afficher le détail et les participants d'un giveaway lui appartenant.
+- [ ] Ajouter systématiquement le filtre `broadcaster_id` aux requêtes.
+- [ ] Retourner `404` pour un giveaway appartenant à un autre streamer.
+
+### Validation
+
+- A ne voit jamais les giveaways de B.
+- Modifier un identifiant dans une URL ne contourne pas l'isolation.
+- Les giveaways terminés ou annulés restent consultables.
+
+## 8. Déploiement et tests
+
+- [ ] Déployer avec systemd dans la configuration NixOS.
+- [ ] Publier uniquement dans le tailnet avec Tailscale Serve.
+- [ ] Ajouter les tests unitaires et d'intégration.
+- [ ] Tester deux streamers et plusieurs sources OBS simultanément.
+- [ ] Documenter l'installation, OAuth, l'URL d'overlay et la récupération après incident.
+
+## MVP multi-streamer terminé
+
+Le MVP cible est terminé lorsque deux streamers connectés avec Twitch peuvent lancer simultanément des giveaways indépendants, utiliser chacun `/overlay/{login_twitch}` et consulter uniquement leur propre historique, avec un seul bot dédié partagé par l'instance.

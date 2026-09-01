@@ -4,6 +4,7 @@ from twitchio import ChatMessage, authentication, eventsub
 from twitchio.ext import commands
 
 from app.application.commands import ChatUser, GiveawayCommandHandler
+from app.core.configuration import ApplicationConfiguration
 from app.core.environment import Settings
 
 LOGGER = logging.getLogger("uvicorn.error")
@@ -13,19 +14,22 @@ class GiveawayTwitchBot(commands.AutoBot):
     def __init__(
         self,
         settings: Settings,
+        configuration: ApplicationConfiguration,
         command_handler: GiveawayCommandHandler,
     ) -> None:
+        twitch_configuration = configuration.twitch
+
         subscription = eventsub.ChatMessageSubscription(
-            broadcaster_user_id=settings.twitch_broadcaster_id,
-            user_id=settings.twitch_bot_id,
+            broadcaster_user_id=twitch_configuration.broadcaster_id,
+            user_id=twitch_configuration.bot_id,
         )
 
         super().__init__(
             client_id=settings.twitch_client_id,
             client_secret=settings.twitch_client_secret.get_secret_value(),
-            bot_id=settings.twitch_bot_id,
-            owner_id=settings.twitch_owner_id,
-            prefix=settings.twitch_command_prefix,
+            bot_id=twitch_configuration.bot_id,
+            owner_id=twitch_configuration.owner_id,
+            prefix=configuration.commands.prefix,
             subscriptions=[subscription],
             force_subscribe=True,
         )

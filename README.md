@@ -2,7 +2,7 @@
 
 Overlay de giveaway pour Twitch, affiché dans OBS comme source navigateur et piloté directement depuis le chat.
 
-> Le parcours Twitch complet est fonctionnel. L’administration web et le déploiement automatisé restent en développement.
+> Le parcours Twitch complet est fonctionnel pour un streamer. La prochaine évolution vise plusieurs streamers simultanés, authentifiés avec Twitch et isolés par chaîne.
 
 ## Fonctionnalités
 
@@ -13,7 +13,7 @@ Overlay de giveaway pour Twitch, affiché dans OBS comme source navigateur et pi
 - persistance et restauration avec SQLite ;
 - API FastAPI et synchronisation des overlays par WebSocket ;
 - overlay HTML minimal personnalisable avec le CSS d’OBS ;
-- configuration locale typée avec Pydantic.
+- bootstrap `.env` et configuration JSON non secrète validés avec Pydantic.
 
 ## Commandes
 
@@ -44,6 +44,33 @@ app/
 ```
 
 Le service est la source de vérité : l’overlay affiche l’état reçu et ne choisit jamais le gagnant.
+
+## Cible multi-streamer
+
+La future architecture prévoit :
+
+- une application Twitch et un compte bot dédié partagés par l'instance ;
+- une connexion à `/admin` avec Twitch OAuth pour chaque streamer ;
+- un moteur, un historique et des WebSockets isolés par identifiant Twitch ;
+- des giveaways simultanés sur plusieurs chaînes ;
+- une URL OBS `/overlay/{login_twitch}` propre à chaque streamer ;
+- un historique filtré exclusivement avec l'identité de la session.
+
+Le Client ID et le Client Secret identifient l'application Twitch, pas le compte bot. Les détails et l'ordre de migration sont décrits dans la documentation technique et le plan de développement.
+
+## Capacité et limites actuelles
+
+Un test local isolé a traité 5 000 requêtes HTTP avec une concurrence de 100 sans erreur, ainsi que 300 connexions WebSocket simultanées. Ces résultats valident les routes de lecture simples, mais pas encore une charge multi-streamer complète.
+
+Avant une mise en production avec du trafic, il reste notamment à :
+
+- réduire les messages WebSocket pour ne plus diffuser toute la liste des participants ;
+- isoler les clients lents avec des files bornées et des délais d'envoi ;
+- passer SQLite en WAL et sortir ses écritures de la boucle asynchrone ;
+- garantir la cohérence entre SQLite et l'état mémoire en cas d'erreur ;
+- superviser TwitchIO, ajouter des contrôles `live`/`ready` et relever la limite de fichiers ouverts.
+
+Le service doit rester sur **un seul worker Uvicorn** tant que les moteurs et WebSockets sont conservés en mémoire.
 
 ## Installation locale
 
@@ -90,11 +117,11 @@ Pour autoriser ou réautoriser un compte :
 4. ouvrir l’URL OAuth avec les scopes adaptés ;
 5. remettre `TWITCH_OAUTH_ENABLED=false` après l’autorisation.
 
-Avec un compte unique pour le bot et le broadcaster, les scopes requis sont `user:read:chat`, `user:write:chat`, `user:bot` et `channel:bot`.
+Le mode mono-streamer actuel peut utiliser un compte unique avec `user:read:chat`, `user:write:chat`, `user:bot` et `channel:bot`. La cible multi-streamer utilisera un bot dédié autorisé une fois, puis `channel:bot` pour chaque streamer connecté.
 
 ## OBS
 
-Ajoute `/overlay` comme source navigateur. Le document expose les identifiants CSS suivants :
+Ajoute `/overlay` comme source navigateur dans le mode actuel. La cible multi-streamer utilisera `/overlay/{login_twitch}`. Le document expose les identifiants CSS suivants :
 
 - `#giveaway`
 - `#lot`

@@ -29,6 +29,8 @@ htmlcov/
 
 # Local application data
 data/settings.json
+data/settings.json.bak
+data/settings.json.tmp
 data/*.sqlite
 data/*.sqlite3
 data/*.sqlite-*

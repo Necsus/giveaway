@@ -29,3 +29,5 @@ class Settings(BaseSettings):
     twitch_channel_login: str
 
     twitch_command_prefix: str = "!"
+
+    giveaway_config_file: Path = PROJECT_ROOT / "data" / "settings.json"

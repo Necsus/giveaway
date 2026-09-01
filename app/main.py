@@ -8,8 +8,10 @@ from fastapi.staticfiles import StaticFiles
 
 from app.application.commands import GiveawayCommandHandler
 from app.application.service import GiveawayService
+from app.core.configuration import configuration_from_settings
 from app.core.environment import Settings
 from app.domain.giveaway import GiveawayEngine
+from app.infrastructure.configuration_store import ConfigurationStore
 from app.infrastructure.database import connect_database, initialize_database
 from app.infrastructure.history import restore_active_giveaway
 from app.infrastructure.twitch import GiveawayTwitchBot
@@ -27,6 +29,12 @@ overlay_connections = OverlayConnectionManager()
 async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     settings = Settings()  # pyright: ignore[reportCallIssue]
 
+    configuration_store = ConfigurationStore(settings.giveaway_config_file)
+    configuration = configuration_store.load()
+    if configuration is None:
+        configuration = configuration_from_settings(settings)
+        configuration_store.save(configuration)
+
     connection = connect_database()
     initialize_database(connection)
     _ = restore_active_giveaway(connection, giveaway_engine)
@@ -38,12 +46,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     )
 
     app.state.settings = settings
+    app.state.configuration = configuration
+    app.state.configuration_store = configuration_store
     app.state.giveaway_service = giveaway_service
 
     giveaway_command_handler = GiveawayCommandHandler(
         service=giveaway_service,
-        broadcaster_id=settings.twitch_broadcaster_id,
-        prefix=settings.twitch_command_prefix,
+        broadcaster_id=configuration.twitch.broadcaster_id,
+        prefix=configuration.commands.prefix,
     )
 
     app.state.giveaway_command_handler = giveaway_command_handler
@@ -51,9 +61,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     twitch_bot: GiveawayTwitchBot | None = None
     twitch_task: asyncio.Task[None] | None = None
 
-    if settings.twitch_enabled:
+    if configuration.twitch.enabled or settings.twitch_oauth_enabled:
         twitch_bot = GiveawayTwitchBot(
             settings=settings,
+            configuration=configuration,
             command_handler=giveaway_command_handler,
         )
         twitch_task = asyncio.create_task(
