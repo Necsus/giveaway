@@ -2,7 +2,7 @@
 
 Overlay de giveaway pour Twitch, affiché dans OBS comme source navigateur et piloté directement depuis le chat.
 
-> Le parcours Twitch complet est fonctionnel pour un streamer. La prochaine évolution vise plusieurs streamers simultanés, authentifiés avec Twitch et isolés par chaîne.
+> Le parcours Twitch complet est fonctionnel avec une chaîne configurée au démarrage. La priorité active est une page `/admin` où un streamer choisit dynamiquement sa chaîne avec Twitch OAuth, tandis que le compte bot reste global et fixe. Plusieurs streamers simultanés viendront ensuite.
 
 ## Fonctionnalités
 
@@ -44,6 +44,18 @@ app/
 ```
 
 Le service est la source de vérité : l’overlay affiche l’état reçu et ne choisit jamais le gagnant.
+
+## Étape active : administration mono-streamer
+
+La première évolution conserve un seul giveaway actif, mais sépare les identités :
+
+- le bot global reste fixe, par exemple `necsus_dev` ;
+- le streamer se connecte sur `/admin`, par exemple `fluffy` ;
+- son identifiant Twitch validé devient le `broadcaster_id` autorisé ;
+- le bot global écoute le chat de ce streamer avec EventSub ;
+- changer de streamer remplace l'unique canal actif.
+
+Le premier tableau de bord affichera l'identité Twitch, le bot utilisé, l'état de l'abonnement au chat, l'URL OBS et la déconnexion.
 
 ## Cible multi-streamer
 
@@ -117,7 +129,7 @@ Pour autoriser ou réautoriser un compte :
 4. ouvrir l’URL OAuth avec les scopes adaptés ;
 5. remettre `TWITCH_OAUTH_ENABLED=false` après l’autorisation.
 
-Le mode mono-streamer actuel peut utiliser un compte unique avec `user:read:chat`, `user:write:chat`, `user:bot` et `channel:bot`. La cible multi-streamer utilisera un bot dédié autorisé une fois, puis `channel:bot` pour chaque streamer connecté.
+Le mode actuel peut encore utiliser un compte unique. L'étape active sépare les autorisations : le bot global est autorisé une fois avec `user:read:chat`, `user:write:chat` et `user:bot`, puis le streamer connecté sur `/admin` accorde `channel:bot`. Les tokens OAuth ne sont jamais stockés dans SQLite ni envoyés au navigateur.
 
 ## OBS
 

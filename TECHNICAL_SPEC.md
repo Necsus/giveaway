@@ -25,7 +25,31 @@ Le socle local est actuellement opérationnel :
 - gestion de plusieurs connexions WebSocket ;
 - overlay HTML/JavaScript sans thème avec reconnexion automatique.
 
-Le fonctionnement actuel reste mono-streamer. Ne sont pas encore implémentés : l'isolation multi-streamer, l'authentification Twitch de `/admin`, les API d'historique filtrées, les abonnements EventSub multi-canaux, le déploiement NixOS et Tailscale. Les tests automatisés sont reportés ; les contrôles actuels sont manuels et complétés par Ruff et BasedPyright.
+Le fonctionnement actuel reste mono-streamer avec un bot et un broadcaster configurés au démarrage. L'étape active introduit un bot global fixe et un seul streamer dynamique connecté par `/admin`. Le `broadcaster_id` et le canal écouté proviendront de l'identité Twitch validée par OAuth, jamais du navigateur. L'isolation de plusieurs streamers simultanés viendra après cette étape. Les tests automatisés sont reportés ; les contrôles actuels sont manuels et complétés par Ruff et BasedPyright.
+
+### Étape intermédiaire retenue
+
+```text
+Bot global fixe (necsus_dev, par exemple)
+                │
+                │ EventSub ChatMessageSubscription
+                │ user_id = bot global
+                │ broadcaster_user_id = streamer actif
+                ▼
+Streamer connecté à /admin (fluffy, par exemple)
+                │
+                └── son chat pilote l'unique moteur de giveaway
+```
+
+Pour cette étape :
+
+- un seul streamer peut être actif à la fois ;
+- l'application Twitch, le Client ID, le Client Secret et le compte bot ne changent pas lors d'une connexion admin ;
+- le bot est autorisé une fois avec `user:read:chat`, `user:write:chat` et `user:bot` ;
+- le streamer connecté autorise l'application avec `channel:bot` ;
+- seul l'identifiant Twitch stable obtenu par OAuth définit le broadcaster autorisé ;
+- la déconnexion de la session web n'arrête ni le bot, ni le giveaway actif ;
+- les tokens restent gérés par TwitchIO et ne sont jamais enregistrés dans les tables métier.
 
 ## 2. Architecture retenue
 
@@ -238,7 +262,13 @@ Exemple :
 
 Le serveur conserve les connexions actives par streamer et supprime proprement les clients déconnectés. Une source OBS rechargée retrouve immédiatement l'état du streamer ciblé, sans diffusion croisée entre les chaînes.
 
-## 9. Administration multi-streamer
+## 9. Administration Twitch
+
+### Première étape mono-streamer dynamique
+
+La première livraison conserve un moteur, un historique et un overlay uniques. La connexion admin choisit le streamer actif dont le chat est écouté par le bot global. Une connexion avec un autre compte remplace explicitement le streamer actif et son abonnement, sans transformer encore le service en plateforme multi-streamer simultanée.
+
+Le premier tableau de bord affiche uniquement l'identité Twitch, le bot global, l'état de l'abonnement au chat, l'URL OBS et la déconnexion. Les réglages et l'historique administratif restent des étapes ultérieures.
 
 ### Authentification Twitch
 
@@ -354,12 +384,12 @@ Emplacement proposé :
 | `twitch_user_id` | TEXT, clé primaire | Identifiant Twitch stable obtenu par OAuth. |
 | `login` | TEXT, unique | Login Twitch utilisé dans l'URL d'overlay. |
 | `display_name` | TEXT | Nom affiché actualisé à la connexion. |
-| `enabled` | INTEGER | Active ou désactive les abonnements du streamer. |
+| `enabled` | INTEGER | Active ou désactive les abonnements du streamer ; une contrainte partielle limite cette valeur à un seul streamer pendant l'étape mono-streamer dynamique. |
 | `command_prefix` | TEXT | Préfixe de commandes propre au streamer. |
 | `created_at` | TEXT | Date UTC de création de l'espace. |
 | `updated_at` | TEXT | Dernière actualisation OAuth ou administrative. |
 
-Les access tokens et refresh tokens ne sont pas stockés dans cette table.
+Les access tokens et refresh tokens ne sont pas stockés dans cette table. Pendant l'étape intermédiaire, un index unique partiel sur une expression constante avec `WHERE enabled = 1` garantit qu'un seul streamer est actif. Cette contrainte sera remplacée lorsque les runtimes multi-streamers seront implémentés.
 
 ### Table `giveaways`
 
@@ -413,7 +443,7 @@ Une contrainte unique sur `(giveaway_id, twitch_user_id)` empêche les doubles i
 7. Connecter le bot global et rétablir les abonnements EventSub de chaque streamer actif.
 8. Démarrer les routes HTTP, OAuth, administratives et les overlays contextualisés.
 
-État actuel : seul le cycle mono-streamer est implémenté. Le registre multi-streamer, les migrations, OAuth dans FastAPI et la reconnexion dynamique restent à réaliser.
+Étape intermédiaire active : charger au plus un streamer actif, démarrer le bot global avec ses propres tokens, puis créer l'abonnement EventSub de ce streamer. OAuth dans FastAPI doit pouvoir remplacer cet abonnement dynamiquement. Le registre de runtimes multi-streamers reste une évolution ultérieure.
 
 Si Twitch est indisponible, l'administration et l'historique doivent rester accessibles. Le service tente une reconnexion avec un délai progressif plafonné.
 
@@ -571,13 +601,16 @@ Les tests automatisés décrits ci-dessous restent l'objectif avant la fin du MV
 7. [x] Injection de `Settings` dans le cycle de vie FastAPI.
 8. [x] Autorisation OAuth et connexion au chat Twitch.
 9. [x] Modèle et stockage atomique de la configuration JSON mono-streamer.
-10. [ ] Réduction des payloads et diffusion WebSocket non bloquante avec backpressure.
-11. [ ] SQLite WAL, accès non bloquant et cohérence transactionnelle mémoire/base.
-12. [ ] Supervision TwitchIO, santé `live`/`ready` et limites de ressources.
-13. [ ] Migrations SQLite versionnées et rattachement des données existantes à un streamer.
-14. [ ] Registre de runtimes isolés par streamer et overlays `/overlay/{login}`.
-15. [ ] Authentification Twitch dans FastAPI et sessions signées.
-16. [ ] Abonnements EventSub dynamiques avec un bot dédié global.
-17. [ ] Administration et historique filtrés par streamer.
-18. [ ] Déploiement NixOS et publication Tailscale.
-19. [ ] Tests automatisés multi-streamer, charge et essais depuis plusieurs OBS.
+10. [ ] **EN COURS** : table SQLite et persistance d'un streamer actif unique.
+11. [ ] Authentification Twitch dans FastAPI, état OAuth et session signée.
+12. [ ] Souscription dynamique du bot global au chat du streamer actif.
+13. [ ] Première page `/admin` : identité, bot, état du chat, URL OBS et déconnexion.
+14. [ ] Réduction des payloads et diffusion WebSocket non bloquante avec backpressure.
+15. [ ] SQLite WAL, accès non bloquant et cohérence transactionnelle mémoire/base.
+16. [ ] Supervision TwitchIO, santé `live`/`ready` et limites de ressources.
+17. [ ] Migrations SQLite versionnées et rattachement des données existantes à un streamer.
+18. [ ] Registre de runtimes isolés par streamer et overlays `/overlay/{login}`.
+19. [ ] Extension de l'administration et de l'historique filtrés par streamer.
+20. [ ] Abonnements EventSub simultanés pour plusieurs streamers.
+21. [ ] Déploiement NixOS et publication Tailscale.
+22. [ ] Tests automatisés multi-streamer, charge et essais depuis plusieurs OBS.

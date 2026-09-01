@@ -2,7 +2,84 @@
 
 Plan pour faire évoluer le giveaway mono-streamer actuel vers un service multi-streamer utilisable simultanément depuis plusieurs chaînes Twitch.
 
-> Avancement actuel : le parcours complet fonctionne pour un streamer avec FastAPI, TwitchIO, OAuth, SQLite, WebSocket et OBS. La cible multi-streamer décrite ci-dessous n'est pas encore implémentée.
+> Avancement actuel : le parcours complet fonctionne avec une identité bot et broadcaster configurée au démarrage. La priorité est désormais une administration OAuth mono-streamer : le bot global reste fixe, tandis que le streamer actif et son canal proviennent de la connexion à `/admin`. La cible multi-streamer simultanée viendra ensuite.
+
+## Priorité active — administration mono-streamer dynamique
+
+Cette étape rend une même installation utilisable successivement par différents streamers sans modifier sa configuration locale. Un seul streamer et un seul giveaway restent actifs à la fois.
+
+### Répartition des rôles
+
+- **DEV** : l'utilisateur conçoit et écrit le code, exécute les validations et explique ses choix.
+- **IA** : l'IA explique les concepts, découpe le travail, fournit des indices et effectue la revue sans modifier le code source.
+- Une seule tâche marquée **EN COURS** est travaillée à la fois.
+
+### A. Identité persistante du streamer actif
+
+- [ ] **DEV — EN COURS** : ajouter le schéma SQLite minimal de `streamers` avec l'identifiant Twitch stable, le login, le nom affiché, l'état actif et les dates UTC.
+- [ ] **DEV** : garantir au niveau SQLite qu'un seul streamer peut être actif.
+- [ ] **DEV** : ajouter les opérations de persistance pour enregistrer ou actualiser un streamer et charger le streamer actif.
+- [ ] **IA** : expliquer les identifiants stables, les contraintes SQLite et relire chaque modification.
+
+#### Validation A
+
+- La création répétée du même identifiant Twitch actualise son login et son nom affiché sans créer de doublon.
+- Deux streamers ne peuvent pas être actifs simultanément.
+- Aucun access token ni refresh token n'est enregistré dans SQLite.
+- Un redémarrage permet de retrouver l'identité du streamer actif.
+
+### B. Authentification web Twitch
+
+- [ ] **DEV** : ajouter la configuration fictive du redirect URI et du secret de session dans `.env.example`.
+- [ ] **DEV** : implémenter `GET /auth/twitch/login` avec le scope streamer `channel:bot`.
+- [ ] **DEV** : créer un état OAuth aléatoire, expirant et à usage unique.
+- [ ] **DEV** : implémenter `GET /auth/twitch/callback`, échanger le code et valider l'identité auprès de Twitch.
+- [ ] **DEV** : persister l'identité validée sans accepter de `broadcaster_id` venant du navigateur.
+- [ ] **DEV** : créer une session signée dans un cookie `HttpOnly`, `Secure` en production et `SameSite=Lax`.
+- [ ] **DEV** : ajouter `POST /auth/logout` et l'expiration de session.
+- [ ] **IA** : expliquer Authorization Code, CSRF, cookies signés et séparation entre session et tokens OAuth.
+
+#### Validation B
+
+- Un état OAuth absent, expiré ou déjà utilisé est refusé.
+- La session contient uniquement une identité Twitch validée côté serveur.
+- Les tokens et secrets ne sont ni envoyés au navigateur, ni écrits dans SQLite, ni journalisés.
+- Une route `/api/admin/*` retourne `401` sans session valide.
+
+### C. Bot fixe et canal dynamique
+
+- [ ] **DEV** : conserver l'identité et les scopes du bot global indépendamment du streamer actif.
+- [ ] **DEV** : retirer la souscription EventSub statique construite avec le broadcaster configuré au démarrage.
+- [ ] **DEV** : après OAuth, ajouter le token streamer à TwitchIO puis souscrire le bot au chat du streamer actif.
+- [ ] **DEV** : construire `ChatMessageSubscription` avec `broadcaster_user_id` égal au streamer et `user_id` égal au bot.
+- [ ] **DEV** : supprimer ou désactiver l'ancien abonnement lors d'un changement de streamer et ignorer tout événement d'un autre canal.
+- [ ] **DEV** : rendre l'autorisation des commandes de gestion dépendante de l'identifiant du streamer actif.
+- [ ] **DEV** : restaurer l'abonnement du streamer actif au redémarrage.
+- [ ] **IA** : expliquer la distinction application, bot, broadcaster, token et abonnement EventSub.
+
+#### Validation C
+
+Avec `fluffy` comme streamer actif et `necsus_dev` comme bot :
+
+- le bot reçoit les messages du chat de `fluffy` ;
+- seul `fluffy` peut utiliser `!lot`, `!start`, `!pull` et `!stop` ;
+- les viewers du canal peuvent utiliser `!join` ;
+- les messages d'une ancienne chaîne ne modifient pas le giveaway.
+
+### D. Première page d'administration
+
+- [ ] **DEV** : créer `/admin` et afficher un bouton **Se connecter avec Twitch** sans session.
+- [ ] **DEV** : afficher après connexion l'avatar, le nom, le login, le streamer actif et le bot global.
+- [ ] **DEV** : afficher séparément l'état de la session et l'état de l'abonnement au chat.
+- [ ] **DEV** : afficher l'URL OBS actuelle avec une action de copie.
+- [ ] **DEV** : ajouter le bouton de déconnexion sans arrêter le bot ni désactiver le streamer.
+- [ ] **IA** : relire l'accessibilité, les états d'erreur et l'absence de secrets dans le frontend.
+
+#### Validation D
+
+- La page distingue clairement une session déconnectée, connectée et une connexion Twitch dégradée.
+- Une déconnexion ferme la session web mais ne coupe pas le giveaway en cours.
+- Recharger la page restaure correctement l'affichage depuis la session.
 
 ## 1. Socle mono-streamer terminé
 
