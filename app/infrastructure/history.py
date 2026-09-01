@@ -2,7 +2,7 @@ import sqlite3
 from datetime import UTC, datetime
 from typing import cast
 
-from app.giveaway import GiveawayEngine, GiveawayState, Participant
+from app.domain.giveaway import GiveawayEngine, GiveawayState, Participant
 
 
 def create_giveaway(connection: sqlite3.Connection, giveaway_id: str, lot: str) -> None:

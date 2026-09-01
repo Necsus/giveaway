@@ -1,15 +1,15 @@
 import asyncio
 import sqlite3
 
-from app.giveaway import GiveawayEngine, Participant
-from app.history import (
+from app.domain.giveaway import GiveawayEngine, Participant
+from app.infrastructure.history import (
     add_participant,
     create_giveaway,
     draw_giveaway,
     open_giveaway,
     stop_giveaway,
 )
-from app.websocket import OverlayConnectionManager
+from app.web.websocket import OverlayConnectionManager
 
 
 class GiveawayService:

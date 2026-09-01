@@ -95,24 +95,29 @@ Chaque installation OBS peut appliquer son propre **CSS personnalisé**. L'état
 
 ```text
 app/
-├── main.py                 # création de l'application FastAPI
-├── giveaway.py             # règles et transitions du giveaway
-├── commands.py             # parsing, permissions et dispatch des commandes
-├── service.py              # coordination moteur, SQLite et WebSocket
-├── twitch.py               # connexion OAuth, abonnement EventSub et écoute Twitch
-├── websocket.py            # connexions et diffusion de l'état
-├── settings.py             # modèle typé de la configuration .env
-├── database.py             # connexion et initialisation SQLite
-├── history.py              # persistance et restauration de l'historique
-├── routes/                 # extraction future des routes de main.py
-│   ├── overlay.py          # page et WebSocket de l'overlay, à créer
-│   └── admin.py            # administration protégée, à créer
-├── static/
-│   ├── overlay.html        # squelette de l'overlay
-│   ├── overlay.js          # réception et rendu de l'état
-│   ├── admin.html          # interface d'administration, à créer
-│   └── admin.js            # logique d'administration, à créer
-└── templates/              # à créer uniquement si nécessaire
+├── main.py                         # assemblage et création de FastAPI
+├── core/
+│   ├── environment.py              # configuration secrète et bootstrap depuis .env
+│   └── configuration.py            # modèle de configuration administrable
+├── domain/
+│   └── giveaway.py                 # règles, états et objets métier purs
+├── application/
+│   ├── commands.py                 # parsing, permissions et dispatch des commandes
+│   └── service.py                  # orchestration des cas d'usage
+├── infrastructure/
+│   ├── database.py                 # connexion et initialisation SQLite
+│   ├── history.py                  # persistance et restauration de l'historique
+│   └── twitch.py                   # OAuth, EventSub et écoute Twitch
+└── web/
+    ├── websocket.py                # connexions et diffusion de l'état
+    ├── routes/                     # extraction future des routes de main.py
+    │   ├── overlay.py              # page et WebSocket de l'overlay, à créer
+    │   └── admin.py                # administration protégée, à créer
+    └── static/
+        ├── overlay.html            # squelette de l'overlay
+        ├── overlay.js              # réception et rendu de l'état
+        ├── admin.html              # interface d'administration, à créer
+        └── admin.js                # logique d'administration, à créer
 
 .env.example                  # modèle versionné avec valeurs fictives
 requirements.txt              # dépendances Python épinglées
@@ -300,21 +305,19 @@ Exemple de structure :
   "version": 1,
   "twitch": {
     "enabled": true,
-    "channel_login": "ma_chaine",
-    "broadcaster_id": "123456",
+    "bot_id": "123456",
+    "owner_id": "654321",
+    "broadcaster_id": "654321",
     "bot_login": "mon_bot",
-    "client_id": "...",
-    "access_token": "...",
-    "refresh_token": "..."
+    "channel_login": "ma_chaine"
   },
   "commands": {
     "prefix": "!"
-  },
-  "admin": {
-    "password_hash": "..."
   }
 }
 ```
+
+Le JSON contient uniquement les réglages non secrets modifiables depuis l'administration. Le Client ID, le Client Secret et le futur secret de bootstrap administrateur restent dans `.env`. Les tokens OAuth restent sous la responsabilité exclusive de TwitchIO dans `.tio.tokens.json`.
 
 Contraintes :
 

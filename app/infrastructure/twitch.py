@@ -3,8 +3,8 @@ import logging
 from twitchio import ChatMessage, authentication, eventsub
 from twitchio.ext import commands
 
-from app.commands import ChatUser, GiveawayCommandHandler
-from app.settings import Settings
+from app.application.commands import ChatUser, GiveawayCommandHandler
+from app.core.environment import Settings
 
 LOGGER = logging.getLogger("uvicorn.error")
 

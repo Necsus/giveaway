@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
-from app.giveaway import Participant
-from app.service import GiveawayService
+from app.application.service import GiveawayService
+from app.domain.giveaway import Participant
 
 
 @dataclass(frozen=True)

@@ -3,20 +3,21 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse
+from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from app.commands import GiveawayCommandHandler
-from app.database import connect_database, initialize_database
-from app.giveaway import GiveawayEngine
-from app.history import restore_active_giveaway
-from app.service import GiveawayService
-from app.settings import Settings
-from app.twitch import GiveawayTwitchBot
-from app.websocket import OverlayConnectionManager
+from app.application.commands import GiveawayCommandHandler
+from app.application.service import GiveawayService
+from app.core.environment import Settings
+from app.domain.giveaway import GiveawayEngine
+from app.infrastructure.database import connect_database, initialize_database
+from app.infrastructure.history import restore_active_giveaway
+from app.infrastructure.twitch import GiveawayTwitchBot
+from app.web.routes.health import router as health_router
+from app.web.routes.overlay import create_overlay_router
+from app.web.websocket import OverlayConnectionManager
 
-STATIC_DIRECTORY = Path(__file__).parent / "static"
+STATIC_DIRECTORY = Path(__file__).parent / "web" / "static"
 
 giveaway_engine = GiveawayEngine()
 overlay_connections = OverlayConnectionManager()
@@ -78,35 +79,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
 
 
 app = FastAPI(title="Twitch Giveaway Overlay", lifespan=lifespan)
+app.include_router(health_router)
+app.include_router(
+    create_overlay_router(
+        giveaway_engine,
+        overlay_connections,
+        STATIC_DIRECTORY,
+    )
+)
 app.mount("/static", StaticFiles(directory=STATIC_DIRECTORY), name="static")
-
-
-@app.get("/health")
-def health() -> dict[str, str]:
-    return {"status": "ok"}
-
-
-@app.get("/overlay", response_class=FileResponse)
-def overlay() -> FileResponse:
-    return FileResponse(STATIC_DIRECTORY / "overlay.html")
-
-
-@app.get("/api/state")
-def giveaway_state() -> dict[str, object]:
-    return giveaway_engine.snapshot()
-
-
-@app.websocket("/ws/overlay")
-async def overlay_websocket(websocket: WebSocket) -> None:
-    await overlay_connections.connect(websocket)
-
-    try:
-        await overlay_connections.send_state(
-            websocket,
-            giveaway_engine.snapshot(),
-        )
-
-        while True:
-            _ = await websocket.receive_text()
-    except WebSocketDisconnect:
-        overlay_connections.disconnect(websocket)
