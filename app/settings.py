@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     )
 
     twitch_enabled: bool
+    twitch_oauth_enabled: bool = False
     twitch_client_id: str
     twitch_client_secret: SecretStr
 

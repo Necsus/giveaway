@@ -56,7 +56,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
             command_handler=giveaway_command_handler,
         )
         twitch_task = asyncio.create_task(
-            twitch_bot.start(),
+            twitch_bot.start(
+                with_adapter=settings.twitch_oauth_enabled,
+            ),
             name="twitch-bot",
         )
 

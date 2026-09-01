@@ -36,7 +36,7 @@ Plan minimal pour obtenir rapidement un giveaway utilisable dans OBS.
 - [x] Protéger le secret client avec `SecretStr`.
 - [x] Injecter `Settings`, le gestionnaire de commandes et le connecteur Twitch dans le cycle de vie FastAPI.
 - [x] Réaliser l'autorisation OAuth et conserver les tokens Twitch hors de Git.
-- [ ] Corriger l'interaction des gestionnaires de signaux de l'adaptateur OAuth TwitchIO et d'Uvicorn lors de l'arrêt.
+- [x] Désactiver l'adaptateur OAuth hors des autorisations afin de garantir l'arrêt propre avec Uvicorn.
 
 ### Validation
 

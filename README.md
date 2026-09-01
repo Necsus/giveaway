@@ -18,7 +18,7 @@ Le socle suivant est disponible :
 - modèle public `.env.example` contenant uniquement de fausses valeurs ;
 - connecteur TwitchIO 3 avec autorisation OAuth, abonnement EventSub et écoute d'un canal ;
 - injection de `Settings`, du gestionnaire de commandes et du connecteur Twitch dans le cycle de vie FastAPI ;
-- démarrage conditionnel du connecteur avec `TWITCH_ENABLED` et arrêt coordonné avec le service ;
+- démarrage conditionnel du connecteur avec `TWITCH_ENABLED`, activation ponctuelle de l'adaptateur avec `TWITCH_OAUTH_ENABLED` et arrêt propre avec le service ;
 - inscriptions uniques par identifiant Twitch et tirage avec `secrets.choice` ;
 - service applicatif protégé contre les commandes concurrentes par un verrou asynchrone ;
 - historique SQLite des giveaways et des participants ;
@@ -30,7 +30,6 @@ Le socle suivant est disponible :
 Restent notamment à réaliser :
 
 - la future configuration administrable en JSON ;
-- la correction de l'interaction entre les gestionnaires de signaux de l'adaptateur OAuth TwitchIO et Uvicorn lors de l'arrêt ;
 - l'authentification et l'interface `/admin` ;
 - la consultation de l'historique ;
 - le déploiement NixOS et la publication privée avec Tailscale.
@@ -146,7 +145,7 @@ L'application Twitch doit déclarer exactement l'URL de redirection suivante :
 http://localhost:4343/oauth/callback
 ```
 
-L'adaptateur OAuth TwitchIO écoute localement sur le port `4343`. Lorsque le service tourne sur une DevBox distante, ce port peut être transmis au PC utilisé pour l'autorisation :
+Lorsque `TWITCH_OAUTH_ENABLED=true`, l'adaptateur OAuth TwitchIO écoute localement sur le port `4343`. Cette option doit rester désactivée en fonctionnement normal. Lorsque le service tourne sur une DevBox distante, le port peut être transmis au PC utilisé pour l'autorisation :
 
 ```powershell
 ssh -L 4343:127.0.0.1:4343 utilisateur@devbox

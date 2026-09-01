@@ -25,7 +25,7 @@ Le socle local est actuellement opérationnel :
 - gestion de plusieurs connexions WebSocket ;
 - overlay HTML/JavaScript sans thème avec reconnexion automatique.
 
-Ne sont pas encore implémentés : la configuration administrable en JSON, l'authentification, `/admin`, les API d'historique, le déploiement NixOS et Tailscale. L'arrêt doit encore être fiabilisé afin d'éviter l'interaction entre les gestionnaires de signaux de l'adaptateur OAuth TwitchIO et d'Uvicorn. Les tests automatisés sont reportés ; les contrôles actuels sont manuels et complétés par Ruff et BasedPyright.
+Ne sont pas encore implémentés : la configuration administrable en JSON, l'authentification, `/admin`, les API d'historique, le déploiement NixOS et Tailscale. Les tests automatisés sont reportés ; les contrôles actuels sont manuels et complétés par Ruff et BasedPyright.
 
 ## 2. Architecture retenue
 
@@ -283,7 +283,7 @@ Le développement local utilise un fichier `.env` à la racine, chargé par `pyd
 
 Le Client Secret est représenté avec `SecretStr`. Le fichier `.env` réel reste ignoré par Git et ne doit jamais être lu, affiché ou journalisé. `.env.example` documente les noms attendus avec des valeurs fictives. Les access tokens et refresh tokens ne sont pas saisis manuellement : ils sont obtenus pendant le parcours OAuth TwitchIO, sauvegardés dans `.tio.tokens.json` et rechargés au démarrage. Ce fichier est ignoré par Git et ne doit jamais être lu, affiché ou partagé.
 
-`Settings`, le gestionnaire de commandes et le connecteur TwitchIO sont créés dans le cycle de vie FastAPI. Le connecteur démarre uniquement lorsque `TWITCH_ENABLED` est actif. Pour le développement distant, l'adaptateur OAuth écoute sur `localhost:4343` et peut être transmis avec un tunnel SSH. L'application Twitch déclare `http://localhost:4343/oauth/callback` comme URL de redirection.
+`Settings`, le gestionnaire de commandes et le connecteur TwitchIO sont créés dans le cycle de vie FastAPI. Le connecteur démarre uniquement lorsque `TWITCH_ENABLED` est actif. L'adaptateur OAuth est activé séparément avec `TWITCH_OAUTH_ENABLED` et reste désactivé en fonctionnement normal afin de ne pas interférer avec la gestion des signaux d'Uvicorn. Pour le développement distant, il écoute alors sur `localhost:4343` et peut être transmis avec un tunnel SSH. L'application Twitch déclare `http://localhost:4343/oauth/callback` comme URL de redirection.
 
 ### Configuration JSON cible
 
