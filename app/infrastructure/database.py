@@ -19,6 +19,15 @@ def connect_database() -> sqlite3.Connection:
 def initialize_database(connection: sqlite3.Connection) -> None:
     cursor = connection.executescript(
         """
+        CREATE TABLE IF NOT EXISTS streamers (
+            twitch_user_id TEXT PRIMARY KEY NOT NULL,
+            login TEXT NOT NULL UNIQUE,
+            display_name TEXT NOT NULL,
+            enabled INTEGER NOT NULL CHECK (enabled IN (0, 1)),
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+
         CREATE TABLE IF NOT EXISTS giveaways (
             id TEXT PRIMARY KEY,
             lot TEXT NOT NULL,
