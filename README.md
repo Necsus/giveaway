@@ -19,16 +19,16 @@ Overlay de giveaway pour Twitch, affiché dans OBS comme source navigateur et pi
 
 | Commande | Accès | Effet |
 |---|---|---|
-| `!lot <lot>` | Streamer | Prépare le lot et affiche l’overlay. |
-| `!start` | Streamer | Ouvre les inscriptions. |
+| `!galot <lot>` | Streamer | Prépare le lot et affiche l’overlay. |
+| `!gastart` | Streamer | Ouvre les inscriptions. |
 | `!join` | Viewer | Inscrit le viewer une seule fois. |
-| `!pull` | Streamer | Ferme les inscriptions et tire un gagnant. |
-| `!stop` | Streamer | Termine le giveaway et masque l’overlay. |
+| `!gapull` | Streamer | Ferme les inscriptions et tire un gagnant. |
+| `!gastop` | Streamer | Termine le giveaway et masque l’overlay. |
 
 ```text
-HIDDEN --!lot--> WAITING --!start--> OPEN --!pull--> WINNER
-   ^                 |                  |                |
-   └-----------------┴----- !stop ------┴----------------┘
+HIDDEN --!galot--> WAITING --!gastart--> OPEN --!gapull--> WINNER
+   ^                   |                    |                  |
+   └-------------------┴------ !gastop -----┴------------------┘
 ```
 
 ## Architecture

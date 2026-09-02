@@ -44,7 +44,7 @@ class GiveawayCommandHandler:
             return None
 
         command, argument = parsed_command
-        management_commands = {"lot", "start", "pull", "stop"}
+        management_commands = {"galot", "gastart", "gapull", "gastop"}
 
         if (
             command in management_commands
@@ -52,7 +52,7 @@ class GiveawayCommandHandler:
         ):
             return CommandResult(False, "This command is reserved for the broadcaster")
 
-        if command != "lot" and argument:
+        if command != "galot" and argument:
             return CommandResult(False, f"{self._prefix}{command} takes no argument")
 
         try:
@@ -68,7 +68,7 @@ class GiveawayCommandHandler:
         command_text, _, argument = normalized_content.partition(" ")
         command = command_text.removeprefix(self._prefix).casefold()
 
-        if command not in {"lot", "start", "join", "pull", "stop"}:
+        if command not in {"galot", "gastart", "join", "gapull", "gastop"}:
             return None
 
         return command, argument.strip()
@@ -80,10 +80,10 @@ class GiveawayCommandHandler:
         author: ChatUser,
     ) -> CommandResult:
         match command:
-            case "lot":
+            case "galot":
                 await self._service.set_lot(argument)
                 return CommandResult(True, "The giveaway is waiting")
-            case "start":
+            case "gastart":
                 await self._service.start()
                 return CommandResult(True, "The giveaway is open")
             case "join":
@@ -98,10 +98,10 @@ class GiveawayCommandHandler:
                     return CommandResult(False, "The viewer is already registered")
 
                 return CommandResult(True, "The viewer is registered")
-            case "pull":
+            case "gapull":
                 winner = await self._service.pull()
                 return CommandResult(True, f"The winner is {winner.display_name}")
-            case "stop":
+            case "gastop":
                 await self._service.stop()
                 return CommandResult(True, "The giveaway is hidden")
             case _:

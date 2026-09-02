@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from app.application.commands import GiveawayCommandHandler
+from app.application.oauth_state import OAuthStateStore
 from app.application.service import GiveawayService
 from app.core.configuration import configuration_from_settings
 from app.core.environment import Settings
@@ -15,6 +16,7 @@ from app.infrastructure.configuration_store import ConfigurationStore
 from app.infrastructure.database import connect_database, initialize_database
 from app.infrastructure.history import restore_active_giveaway
 from app.infrastructure.twitch import GiveawayTwitchBot
+from app.web.routes.auth import router as auth_router
 from app.web.routes.health import router as health_router
 from app.web.routes.overlay import create_overlay_router
 from app.web.websocket import OverlayConnectionManager
@@ -48,6 +50,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     app.state.settings = settings
     app.state.configuration = configuration
     app.state.configuration_store = configuration_store
+    app.state.oauth_state_store = OAuthStateStore()
     app.state.giveaway_service = giveaway_service
 
     giveaway_command_handler = GiveawayCommandHandler(
@@ -91,6 +94,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
 
 app = FastAPI(title="Twitch Giveaway Overlay", lifespan=lifespan)
 app.include_router(health_router)
+app.include_router(auth_router)
 app.include_router(
     create_overlay_router(
         giveaway_engine,

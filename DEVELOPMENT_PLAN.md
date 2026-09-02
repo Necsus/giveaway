@@ -31,10 +31,13 @@ Cette étape rend une même installation utilisable successivement par différen
 
 ### B. Authentification web Twitch
 
-- [ ] **DEV — EN COURS** : ajouter la configuration fictive du redirect URI et du secret de session dans `.env.example`.
-- [ ] **DEV** : implémenter `GET /auth/twitch/login` avec le scope streamer `channel:bot`.
-- [ ] **DEV** : créer un état OAuth aléatoire, expirant et à usage unique.
-- [ ] **DEV** : implémenter `GET /auth/twitch/callback`, échanger le code et valider l'identité auprès de Twitch.
+- [x] **DEV** : ajouter la configuration fictive du redirect URI et du secret de session dans `.env.example`.
+- [x] **DEV** : construire l'URL d'autorisation Twitch avec le scope streamer `channel:bot`.
+- [x] **DEV** : créer un état OAuth aléatoire, expirant et à usage unique.
+- [x] **DEV** : implémenter `GET /auth/twitch/login` avec une redirection vers Twitch.
+- [x] **DEV** : échanger le code OAuth et valider le Client ID, l'identité et le scope auprès de Twitch.
+- [x] **DEV** : récupérer le profil Twitch validé, notamment le nom affiché.
+- [ ] **DEV — EN COURS** : implémenter `GET /auth/twitch/callback` et y valider le `state` avant tout échange.
 - [ ] **DEV** : persister l'identité validée sans accepter de `broadcaster_id` venant du navigateur.
 - [ ] **DEV** : créer une session signée dans un cookie `HttpOnly`, `Secure` en production et `SameSite=Lax`.
 - [ ] **DEV** : ajouter `POST /auth/logout` et l'expiration de session.
@@ -63,7 +66,7 @@ Cette étape rend une même installation utilisable successivement par différen
 Avec `fluffy` comme streamer actif et `necsus_dev` comme bot :
 
 - le bot reçoit les messages du chat de `fluffy` ;
-- seul `fluffy` peut utiliser `!lot`, `!start`, `!pull` et `!stop` ;
+- seul `fluffy` peut utiliser `!galot`, `!gastart`, `!gapull` et `!gastop` ;
 - les viewers du canal peuvent utiliser `!join` ;
 - les messages d'une ancienne chaîne ne modifient pas le giveaway.
 
@@ -85,7 +88,7 @@ Avec `fluffy` comme streamer actif et `necsus_dev` comme bot :
 ## 1. Socle mono-streamer terminé
 
 - [x] Définir les états `HIDDEN`, `WAITING`, `OPEN` et `WINNER`.
-- [x] Gérer `!lot`, `!start`, `!join`, `!pull` et `!stop`.
+- [x] Gérer `!galot`, `!gastart`, `!join`, `!gapull` et `!gastop`.
 - [x] Réserver les commandes de gestion au broadcaster.
 - [x] Empêcher les doubles inscriptions.
 - [x] Choisir le gagnant côté serveur avec `secrets.choice`.
@@ -96,6 +99,25 @@ Avec `fluffy` comme streamer actif et `necsus_dev` comme bot :
 - [x] Valider et écrire atomiquement `settings.json`.
 - [x] Injecter la configuration dans le cycle de vie FastAPI.
 - [x] Tester manuellement le parcours Twitch complet dans OBS.
+
+### Évolution planifiée — plusieurs gagnants pour un même lot
+
+- [ ] Remplacer le gagnant unique par une collection ordonnée de gagnants.
+- [ ] Faire du premier `!gapull` la fermeture définitive des inscriptions pour le lot courant et le tirage du premier gagnant.
+- [ ] Autoriser de nouveaux `!gapull` dans l'état `WINNER` jusqu'à `!gastop`.
+- [ ] Exclure des tirages suivants tous les utilisateurs ayant déjà gagné ce lot.
+- [ ] Refuser proprement un nouveau tirage lorsque tous les participants ont déjà gagné.
+- [ ] Persister l'ordre de tous les gagnants et le restaurer après redémarrage.
+- [ ] Afficher la liste des gagnants dans l'overlay et les événements WebSocket.
+- [ ] Adapter les tests du moteur, des commandes et de SQLite aux tirages multiples.
+
+#### Validation des tirages multiples
+
+- Les inscriptions restent ouvertes jusqu'au premier `!gapull`, puis sont définitivement fermées pour ce lot.
+- Chaque `!gapull` accepté ajoute un gagnant qui n'a encore jamais gagné ce lot.
+- Les tirages peuvent continuer autant que nécessaire jusqu'à `!gastop` ou jusqu'à épuisement des participants.
+- Un redémarrage conserve tous les gagnants déjà tirés et leur ordre.
+- `!gastop` archive le lot avec l'ensemble de ses gagnants.
 
 ## 2. Stabilisation sous charge
 

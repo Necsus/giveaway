@@ -158,9 +158,9 @@ Cette arborescence est indicative. Les règles métier doivent rester indépenda
 L'overlay suit quatre états :
 
 ```text
-HIDDEN --!lot--> WAITING --!start--> OPEN --!pull--> WINNER
-   ^                 |                   |                |
-   └-----------------┴------ !stop ------┴----------------┘
+HIDDEN --!galot--> WAITING --!gastart--> OPEN --!gapull--> WINNER
+   ^                   |                     |                  |
+   └-------------------┴------ !gastop -------┴------------------┘
 ```
 
 | État | Overlay | Inscriptions | Description |
@@ -192,20 +192,20 @@ L'état actif contient au minimum :
 
 | Commande | État requis | Résultat |
 |---|---|---|
-| `!lot <nom>` | `HIDDEN` | Crée le giveaway et passe à `WAITING`. |
-| `!start` | `WAITING` | Passe à `OPEN`. |
+| `!galot <nom>` | `HIDDEN` | Crée le giveaway et passe à `WAITING`. |
+| `!gastart` | `WAITING` | Passe à `OPEN`. |
 | `!join` | `OPEN` | Ajoute le viewer s'il n'est pas déjà inscrit. |
-| `!pull` | `OPEN` | Ferme les inscriptions, choisit un gagnant et passe à `WINNER`. |
-| `!stop` | `WAITING`, `OPEN` ou `WINNER` | Archive l'état courant puis repasse à `HIDDEN`. |
+| `!gapull` | `OPEN` | Ferme les inscriptions, choisit un gagnant et passe à `WINNER`. |
+| `!gastop` | `WAITING`, `OPEN` ou `WINNER` | Archive l'état courant puis repasse à `HIDDEN`. |
 
 Règles complémentaires :
 
-- `!lot`, `!start`, `!pull` et `!stop` sont réservées au broadcaster du canal où la commande est reçue ;
+- `!galot`, `!gastart`, `!gapull` et `!gastop` sont réservées au broadcaster du canal où la commande est reçue ;
 - l'autorisation est vérifiée avec l'identifiant Twitch, pas avec le nom affiché ;
-- `!lot` est refusé si un giveaway est déjà visible ;
-- `!pull` est refusé lorsqu'aucun participant n'est inscrit ;
+- `!galot` est refusé si un giveaway est déjà visible ;
+- `!gapull` est refusé lorsqu'aucun participant n'est inscrit ;
 - le gagnant est choisi une seule fois côté serveur avec `secrets.choice` ;
-- un verrou asynchrone protège `!join`, `!pull` et `!stop` contre les traitements concurrents ;
+- un verrou asynchrone protège `!join`, `!gapull` et `!gastop` contre les traitements concurrents ;
 - chaque transition valide déclenche une sauvegarde SQLite et une diffusion WebSocket.
 
 ## 7. Overlay HTML
@@ -399,10 +399,10 @@ Les access tokens et refresh tokens ne sont pas stockés dans cette table. Penda
 | `broadcaster_id` | TEXT, clé étrangère | Propriétaire du giveaway, référence `streamers.twitch_user_id`. |
 | `lot` | TEXT | Nom du lot. |
 | `status` | TEXT | `WAITING`, `OPEN`, `WINNER`, `COMPLETED` ou `CANCELLED`. |
-| `created_at` | TEXT | Date UTC de `!lot`. |
-| `opened_at` | TEXT, nullable | Date UTC de `!start`. |
-| `drawn_at` | TEXT, nullable | Date UTC de `!pull`. |
-| `stopped_at` | TEXT, nullable | Date UTC de `!stop`. |
+| `created_at` | TEXT | Date UTC de `!galot`. |
+| `opened_at` | TEXT, nullable | Date UTC de `!gastart`. |
+| `drawn_at` | TEXT, nullable | Date UTC de `!gapull`. |
+| `stopped_at` | TEXT, nullable | Date UTC de `!gastop`. |
 | `winner_user_id` | TEXT, nullable | Identifiant Twitch du gagnant. |
 | `winner_display_name` | TEXT, nullable | Nom affiché au moment du tirage. |
 
@@ -426,8 +426,8 @@ Une contrainte unique sur `(giveaway_id, twitch_user_id)` empêche les doubles i
 - les transitions et inscriptions utilisent des transactions ;
 - les dates sont enregistrées en UTC ;
 - au démarrage, le service recharge au plus un giveaway actif par streamer ;
-- `!pull` enregistre le statut `WINNER` tant que le résultat reste affiché ;
-- `!stop` transforme `WINNER` en `COMPLETED`, ou `WAITING`/`OPEN` en `CANCELLED`, puis masque l'overlay sans supprimer l'historique ;
+- `!gapull` enregistre le statut `WINNER` tant que le résultat reste affiché ;
+- `!gastop` transforme `WINNER` en `COMPLETED`, ou `WAITING`/`OPEN` en `CANCELLED`, puis masque l'overlay sans supprimer l'historique ;
 - les migrations de schéma sont versionnées et exécutées au démarrage.
 
 État actuel : le schéma mono-streamer utilise encore une unicité globale. La migration devra créer `streamers`, rattacher les données existantes au streamer de bootstrap, ajouter `giveaways.broadcaster_id`, remplacer l'index global et versionner le schéma sans perdre l'historique. Le mode WAL reste également à ajouter avant le déploiement.
@@ -554,7 +554,7 @@ Les tests automatisés décrits ci-dessous restent l'objectif avant la fin du MV
 - parseur des cinq commandes ;
 - refus des commandes dans le mauvais état ;
 - double `!join` ;
-- `!pull` avec 0, 1 et plusieurs participants ;
+- `!gapull` avec 0, 1 et plusieurs participants ;
 - unicité et conservation du gagnant ;
 - chargement et validation de `.env` sans exposition des secrets ;
 - validation et écriture atomique du JSON global ;
