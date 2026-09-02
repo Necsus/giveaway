@@ -63,6 +63,10 @@ def initialize_database(connection: sqlite3.Connection) -> None:
             UNIQUE (giveaway_id, twitch_user_id)
         );
 
+        CREATE UNIQUE INDEX IF NOT EXISTS one_active_streamer
+        ON streamers ((1))
+        WHERE enabled IN (1);
+
         CREATE UNIQUE INDEX IF NOT EXISTS one_active_giveaway
         ON giveaways ((1))
         WHERE status IN ('WAITING', 'OPEN', 'WINNER');

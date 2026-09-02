@@ -17,9 +17,10 @@ Cette étape rend une même installation utilisable successivement par différen
 ### A. Identité persistante du streamer actif
 
 - [x] **DEV** : ajouter le schéma SQLite minimal de `streamers` avec l'identifiant Twitch stable, le login, le nom affiché, l'état actif et les dates UTC.
-- [ ] **DEV — EN COURS** : garantir au niveau SQLite qu'un seul streamer peut être actif.
-- [ ] **DEV** : ajouter les opérations de persistance pour enregistrer ou actualiser un streamer et charger le streamer actif.
-- [ ] **IA** : expliquer les identifiants stables, les contraintes SQLite et relire chaque modification.
+- [x] **DEV** : garantir au niveau SQLite qu'un seul streamer peut être actif.
+- [x] **DEV** : ajouter l'opération de persistance pour enregistrer ou actualiser le streamer actif.
+- [x] **DEV** : ajouter l'opération de persistance pour charger le streamer actif.
+- [x] **IA** : expliquer les identifiants stables, les contraintes SQLite et relire chaque modification.
 
 #### Validation A
 
@@ -30,7 +31,7 @@ Cette étape rend une même installation utilisable successivement par différen
 
 ### B. Authentification web Twitch
 
-- [ ] **DEV** : ajouter la configuration fictive du redirect URI et du secret de session dans `.env.example`.
+- [ ] **DEV — EN COURS** : ajouter la configuration fictive du redirect URI et du secret de session dans `.env.example`.
 - [ ] **DEV** : implémenter `GET /auth/twitch/login` avec le scope streamer `channel:bot`.
 - [ ] **DEV** : créer un état OAuth aléatoire, expirant et à usage unique.
 - [ ] **DEV** : implémenter `GET /auth/twitch/callback`, échanger le code et valider l'identité auprès de Twitch.
