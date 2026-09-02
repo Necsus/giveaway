@@ -16,8 +16,8 @@ Cette étape rend une même installation utilisable successivement par différen
 
 ### A. Identité persistante du streamer actif
 
-- [ ] **DEV — EN COURS** : ajouter le schéma SQLite minimal de `streamers` avec l'identifiant Twitch stable, le login, le nom affiché, l'état actif et les dates UTC.
-- [ ] **DEV** : garantir au niveau SQLite qu'un seul streamer peut être actif.
+- [x] **DEV** : ajouter le schéma SQLite minimal de `streamers` avec l'identifiant Twitch stable, le login, le nom affiché, l'état actif et les dates UTC.
+- [ ] **DEV — EN COURS** : garantir au niveau SQLite qu'un seul streamer peut être actif.
 - [ ] **DEV** : ajouter les opérations de persistance pour enregistrer ou actualiser un streamer et charger le streamer actif.
 - [ ] **IA** : expliquer les identifiants stables, les contraintes SQLite et relire chaque modification.
 

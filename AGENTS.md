@@ -28,3 +28,4 @@
 - Préserver du temps pour comprendre l’existant avant de modifier le code et pour relire le résultat après l’implémentation.
 - Ne pas ajouter une nouvelle abstraction, dépendance ou fonctionnalité tant que le besoin actuel ne la justifie pas.
 - À la fin de chaque étape, résumer ce qui a été appris, ce qui a été validé et la prochaine étape, puis attendre avant de poursuivre.
+- Dès qu’une étape est validée, mettre systématiquement à jour le fichier Markdown correspondant afin que l’avancement documenté reste synchronisé avec l’implémentation.
