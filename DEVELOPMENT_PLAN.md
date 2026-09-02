@@ -85,6 +85,41 @@ Avec `fluffy` comme streamer actif et `necsus_dev` comme bot :
 - Une déconnexion ferme la session web mais ne coupe pas le giveaway en cours.
 - Recharger la page restaure correctement l'affichage depuis la session.
 
+### E. Nettoyage des chemins remplacés
+
+Le nettoyage suit toujours l'ordre **remplacer, valider, puis supprimer** afin de ne pas perdre l'autorisation du bot ni l'accès au chat pendant la migration.
+
+#### Nettoyage lié à A — identité persistante
+
+- [ ] Après la bascule dynamique de C, retirer `TWITCH_BROADCASTER_ID` et `TWITCH_CHANNEL_LOGIN` de `Settings`, de `.env.example` et du bootstrap JSON.
+- [ ] Retirer `broadcaster_id` et `channel_login` de la configuration globale lorsque SQLite est devenue l'unique source de l'identité streamer.
+
+#### Nettoyage lié à B — authentification web
+
+- [ ] Fournir et valider un mécanisme de bootstrap unique pour l'autorisation initiale du bot global.
+- [ ] Après ce remplacement, supprimer l'adaptateur OAuth local TwitchIO, `TWITCH_OAUTH_ENABLED`, l'option `with_adapter` et le callback `localhost:4343`.
+- [ ] Supprimer du README et de la spécification le tunnel SSH sur le port `4343` et les anciennes instructions d'autorisation.
+- [ ] Vérifier que `/auth/twitch/callback` est le seul callback OAuth utilisé pour les streamers.
+
+#### Nettoyage lié à C — canal dynamique
+
+- [ ] Supprimer toute construction d'abonnement EventSub à partir d'un broadcaster configuré au démarrage.
+- [ ] Supprimer les branches de compatibilité qui autorisent encore les commandes avec l'ancien broadcaster statique.
+- [ ] Vérifier qu'aucun ancien abonnement EventSub ne reste actif après un changement de streamer.
+
+#### Nettoyage lié à D — administration
+
+- [ ] Supprimer les réponses, routes ou éléments frontend temporaires remplacés pendant la construction de `/admin`.
+- [ ] Vérifier qu'aucun ancien réglage streamer n'est encore affiché ou accepté par l'administration.
+- [ ] Rechercher les références mortes dans le code et la documentation avant de valider la page.
+
+#### Validation du nettoyage
+
+- Une recherche globale ne trouve plus `TWITCH_OAUTH_ENABLED`, `localhost:4343`, `TWITCH_BROADCASTER_ID` ni `TWITCH_CHANNEL_LOGIN`.
+- Le démarrage normal ne dépend plus d'un broadcaster statique dans `.env` ou `settings.json`.
+- Le bot global peut toujours être autorisé et restauré après suppression de l'ancien adaptateur.
+- Il n'existe qu'un seul parcours OAuth streamer et une seule source de vérité pour son identité.
+
 ## 1. Socle mono-streamer terminé
 
 - [x] Définir les états `HIDDEN`, `WAITING`, `OPEN` et `WINNER`.
