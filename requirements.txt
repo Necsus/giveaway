@@ -3,3 +3,4 @@ uvicorn[standard]==0.52.4
 twitchio==3.3.2
 pydantic-settings==2.15.0
 itsdangerous==2.2.0
+typing-extensions==4.16.0

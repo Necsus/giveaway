@@ -1,3 +1,4 @@
+import logging
 import sqlite3
 from typing import cast
 
@@ -5,15 +6,19 @@ import aiohttp
 from fastapi import APIRouter, HTTPException, Request, Response, status
 from fastapi.responses import JSONResponse, RedirectResponse
 from twitchio.exceptions import HTTPException as TwitchHTTPException
+from twitchio.exceptions import TwitchioException
 
 from app.application.oauth_state import OAuthStateStore
 from app.application.session import SESSION_COOKIE_NAME, SessionSigner
 from app.core.environment import Settings
 from app.infrastructure.streamers import save_active_streamer
+from app.infrastructure.twitch import GiveawayTwitchBot
 from app.infrastructure.twitch_oauth import (
     TwitchOAuthClient,
     build_authorization_url,
 )
+
+LOGGER = logging.getLogger("uvicorn.error")
 
 router = APIRouter()
 
@@ -103,6 +108,24 @@ async def twitch_callback(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Unable to persist the Twitch identity",
         ) from None
+
+    twitch_bot = cast(
+        GiveawayTwitchBot | None,
+        request.app.state.twitch_bot,
+    )
+    request.app.state.twitch_chat_ready = False
+
+    if twitch_bot is not None:
+        try:
+            await twitch_bot.subscribe_to_streamer(authorization)
+        except (TwitchioException, aiohttp.ClientError, ValueError) as subscribe_error:
+            LOGGER.warning(
+                "Unable to subscribe to Twitch chat: streamer_id=%s error=%s",
+                authorization.twitch_user_id,
+                type(subscribe_error).__name__,
+            )
+        else:
+            request.app.state.twitch_chat_ready = True
 
     settings = cast(Settings, request.app.state.settings)
     session_signer = cast(

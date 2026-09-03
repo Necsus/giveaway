@@ -55,12 +55,13 @@ Cette étape rend une même installation utilisable successivement par différen
 
 ### C. Bot fixe et canal dynamique
 
-- [ ] **DEV — EN COURS** : conserver l'identité et les scopes du bot global indépendamment du streamer actif.
-- [ ] **DEV** : retirer la souscription EventSub statique construite avec le broadcaster configuré au démarrage.
-- [ ] **DEV** : après OAuth, ajouter le token streamer à TwitchIO puis souscrire le bot au chat du streamer actif.
-- [ ] **DEV** : construire `ChatMessageSubscription` avec `broadcaster_user_id` égal au streamer et `user_id` égal au bot.
-- [ ] **DEV** : supprimer ou désactiver l'ancien abonnement lors d'un changement de streamer et ignorer tout événement d'un autre canal.
-- [ ] **DEV** : rendre l'autorisation des commandes de gestion dépendante de l'identifiant du streamer actif.
+- [x] **DEV** : conserver l'identité et les scopes du bot global indépendamment du streamer actif.
+- [x] **DEV** : retirer la souscription EventSub statique construite avec le broadcaster configuré au démarrage.
+- [x] **DEV** : ajouter au bot une opération dynamique qui enregistre le token streamer dans TwitchIO et souscrit au chat.
+- [x] **DEV** : construire `ChatMessageSubscription` avec `broadcaster_user_id` égal au streamer et `user_id` égal au bot.
+- [x] **DEV** : appeler l'abonnement dynamique après le callback OAuth sans exposer les tokens.
+- [x] **DEV** : supprimer ou désactiver l'ancien abonnement lors d'un changement de streamer et ignorer tout événement d'un autre canal.
+- [ ] **DEV — EN COURS** : rendre l'autorisation des commandes de gestion dépendante de l'identifiant du streamer actif.
 - [ ] **DEV** : restaurer l'abonnement du streamer actif au redémarrage.
 - [ ] **IA** : expliquer la distinction application, bot, broadcaster, token et abonnement EventSub.
 
