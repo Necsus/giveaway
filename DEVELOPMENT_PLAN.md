@@ -37,11 +37,14 @@ Cette étape rend une même installation utilisable successivement par différen
 - [x] **DEV** : implémenter `GET /auth/twitch/login` avec une redirection vers Twitch.
 - [x] **DEV** : échanger le code OAuth et valider le Client ID, l'identité et le scope auprès de Twitch.
 - [x] **DEV** : récupérer le profil Twitch validé, notamment le nom affiché.
-- [ ] **DEV — EN COURS** : implémenter `GET /auth/twitch/callback` et y valider le `state` avant tout échange.
-- [ ] **DEV** : persister l'identité validée sans accepter de `broadcaster_id` venant du navigateur.
-- [ ] **DEV** : créer une session signée dans un cookie `HttpOnly`, `Secure` en production et `SameSite=Lax`.
-- [ ] **DEV** : ajouter `POST /auth/logout` et l'expiration de session.
-- [ ] **IA** : expliquer Authorization Code, CSRF, cookies signés et séparation entre session et tokens OAuth.
+- [x] **DEV** : implémenter `GET /auth/twitch/callback` et y valider le `state` avant tout échange.
+- [x] **DEV** : persister l'identité validée sans accepter de `broadcaster_id` venant du navigateur.
+- [x] **DEV** : signer et vérifier une identité de session avec expiration et contenu minimal.
+- [x] **DEV** : créer le cookie de session `HttpOnly`, `Secure` en production et `SameSite=Lax`.
+- [x] **DEV** : ajouter `POST /auth/logout` et l'expiration de session.
+- [x] **DEV** : ajouter une dépendance de session réutilisable qui refuse les cookies absents, invalides ou expirés.
+- [x] **DEV** : protéger une première route `/api/admin/*` et vérifier qu'elle retourne `401` sans session valide.
+- [x] **IA** : expliquer Authorization Code, CSRF, cookies signés et séparation entre session et tokens OAuth.
 
 #### Validation B
 
@@ -52,7 +55,7 @@ Cette étape rend une même installation utilisable successivement par différen
 
 ### C. Bot fixe et canal dynamique
 
-- [ ] **DEV** : conserver l'identité et les scopes du bot global indépendamment du streamer actif.
+- [ ] **DEV — EN COURS** : conserver l'identité et les scopes du bot global indépendamment du streamer actif.
 - [ ] **DEV** : retirer la souscription EventSub statique construite avec le broadcaster configuré au démarrage.
 - [ ] **DEV** : après OAuth, ajouter le token streamer à TwitchIO puis souscrire le bot au chat du streamer actif.
 - [ ] **DEV** : construire `ChatMessageSubscription` avec `broadcaster_user_id` égal au streamer et `user_id` égal au bot.

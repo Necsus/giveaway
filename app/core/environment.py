@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import ClassVar
 
-from pydantic import SecretStr
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -30,6 +30,8 @@ class Settings(BaseSettings):
 
     twitch_admin_redirect_uri: str
     session_secret: SecretStr
+    session_cookie_secure: bool = False
+    session_max_age_seconds: int = Field(default=28_800, gt=0)
 
     twitch_command_prefix: str = "!"
 

@@ -9,6 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from app.application.commands import GiveawayCommandHandler
 from app.application.oauth_state import OAuthStateStore
 from app.application.service import GiveawayService
+from app.application.session import SessionSigner
 from app.core.configuration import configuration_from_settings
 from app.core.environment import Settings
 from app.domain.giveaway import GiveawayEngine
@@ -16,6 +17,8 @@ from app.infrastructure.configuration_store import ConfigurationStore
 from app.infrastructure.database import connect_database, initialize_database
 from app.infrastructure.history import restore_active_giveaway
 from app.infrastructure.twitch import GiveawayTwitchBot
+from app.infrastructure.twitch_oauth import TwitchOAuthClient
+from app.web.routes.admin import router as admin_router
 from app.web.routes.auth import router as auth_router
 from app.web.routes.health import router as health_router
 from app.web.routes.overlay import create_overlay_router
@@ -30,6 +33,17 @@ overlay_connections = OverlayConnectionManager()
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     settings = Settings()  # pyright: ignore[reportCallIssue]
+
+    session_signer = SessionSigner(
+        secret_key=settings.session_secret.get_secret_value(),
+        max_age_seconds=settings.session_max_age_seconds,
+    )
+
+    twitch_oauth_client = TwitchOAuthClient(
+        client_id=settings.twitch_client_id,
+        client_secret=settings.twitch_client_secret.get_secret_value(),
+        redirect_uri=settings.twitch_admin_redirect_uri,
+    )
 
     configuration_store = ConfigurationStore(settings.giveaway_config_file)
     configuration = configuration_store.load()
@@ -48,9 +62,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     )
 
     app.state.settings = settings
+    app.state.database_connection = connection
     app.state.configuration = configuration
     app.state.configuration_store = configuration_store
+    app.state.session_signer = session_signer
     app.state.oauth_state_store = OAuthStateStore()
+    app.state.twitch_oauth_client = twitch_oauth_client
     app.state.giveaway_service = giveaway_service
 
     giveaway_command_handler = GiveawayCommandHandler(
@@ -89,12 +106,16 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
             if twitch_task is not None:
                 await twitch_task
         finally:
-            connection.close()
+            try:
+                await twitch_oauth_client.close()
+            finally:
+                connection.close()
 
 
 app = FastAPI(title="Twitch Giveaway Overlay", lifespan=lifespan)
 app.include_router(health_router)
 app.include_router(auth_router)
+app.include_router(admin_router)
 app.include_router(
     create_overlay_router(
         giveaway_engine,

@@ -1,11 +1,19 @@
+import sqlite3
 from typing import cast
 
-from fastapi import APIRouter, Request, status
-from fastapi.responses import RedirectResponse
+import aiohttp
+from fastapi import APIRouter, HTTPException, Request, Response, status
+from fastapi.responses import JSONResponse, RedirectResponse
+from twitchio.exceptions import HTTPException as TwitchHTTPException
 
 from app.application.oauth_state import OAuthStateStore
+from app.application.session import SESSION_COOKIE_NAME, SessionSigner
 from app.core.environment import Settings
-from app.infrastructure.twitch_oauth import build_authorization_url
+from app.infrastructure.streamers import save_active_streamer
+from app.infrastructure.twitch_oauth import (
+    TwitchOAuthClient,
+    build_authorization_url,
+)
 
 router = APIRouter()
 
@@ -30,3 +38,113 @@ def twitch_login(request: Request) -> RedirectResponse:
         url=authorization_url,
         status_code=status.HTTP_302_FOUND,
     )
+
+
+@router.get("/auth/twitch/callback")
+async def twitch_callback(
+    request: Request,
+    code: str | None = None,
+    state: str | None = None,
+    error: str | None = None,
+) -> JSONResponse:
+    oauth_state_store = cast(
+        OAuthStateStore,
+        request.app.state.oauth_state_store,
+    )
+
+    if state is None or not oauth_state_store.consume(state):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired OAuth state",
+        )
+
+    if error is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Twitch authorization was denied",
+        )
+
+    if code is None or not code.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Missing OAuth authorization code",
+        )
+
+    twitch_oauth_client = cast(
+        TwitchOAuthClient,
+        request.app.state.twitch_oauth_client,
+    )
+
+    try:
+        authorization = await twitch_oauth_client.exchange_code(code)
+
+        connection = cast(
+            sqlite3.Connection,
+            request.app.state.database_connection,
+        )
+        save_active_streamer(
+            connection,
+            twitch_user_id=authorization.twitch_user_id,
+            login=authorization.login,
+            display_name=authorization.display_name,
+        )
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid Twitch authorization",
+        ) from None
+    except (TwitchHTTPException, aiohttp.ClientError):
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Twitch authentication is temporarily unavailable",
+        ) from None
+    except sqlite3.Error:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Unable to persist the Twitch identity",
+        ) from None
+
+    settings = cast(Settings, request.app.state.settings)
+    session_signer = cast(
+        SessionSigner,
+        request.app.state.session_signer,
+    )
+    cookie_value = session_signer.create(
+        authorization.twitch_user_id,
+    )
+
+    response = JSONResponse(
+        content={
+            "twitch_user_id": authorization.twitch_user_id,
+            "login": authorization.login,
+            "display_name": authorization.display_name,
+        }
+    )
+    response.set_cookie(
+        key=SESSION_COOKIE_NAME,
+        value=cookie_value,
+        max_age=settings.session_max_age_seconds,
+        httponly=True,
+        secure=settings.session_cookie_secure,
+        samesite="lax",
+        path="/",
+    )
+
+    return response
+
+
+@router.post(
+    "/auth/logout",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+def logout(request: Request) -> Response:
+    settings = cast(Settings, request.app.state.settings)
+    response = Response(status_code=status.HTTP_204_NO_CONTENT)
+    response.delete_cookie(
+        key=SESSION_COOKIE_NAME,
+        path="/",
+        secure=settings.session_cookie_secure,
+        httponly=True,
+        samesite="lax",
+    )
+    return response
