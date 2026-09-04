@@ -76,8 +76,8 @@ Avec `fluffy` comme streamer actif et `necsus_dev` comme bot :
 
 ### D. Première page d'administration
 
-- [ ] **DEV — EN COURS** : créer `/admin` et afficher un bouton **Se connecter avec Twitch** sans session.
-- [ ] **DEV** : afficher après connexion l'avatar, le nom, le login, le streamer actif et le bot global.
+- [x] **DEV** : créer `/admin` et afficher un bouton **Se connecter avec Twitch** sans session.
+- [ ] **DEV — EN COURS** : afficher après connexion l'avatar, le nom, le login, le streamer actif et le bot global.
 - [ ] **DEV** : afficher séparément l'état de la session et l'état de l'abonnement au chat.
 - [ ] **DEV** : afficher l'URL OBS actuelle avec une action de copie.
 - [ ] **DEV** : ajouter le bouton de déconnexion sans arrêter le bot ni désactiver le streamer.
