@@ -3,13 +3,74 @@
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script src="/static/admin.js" defer></script>
     <title>Administration du giveaway</title>
   </head>
   <body>
     <main>
       <h1>Administration du giveaway</h1>
-      <p>Connectez-vous avec Twitch pour administrer votre giveaway.</p>
-      <a href="/auth/twitch/login">Se connecter avec Twitch</a>
+
+      <section id="disconnected-state" aria-labelledby="connection-title">
+        <h2 id="connection-title">Connexion Twitch</h2>
+        <p>
+          Session Web :
+          <strong>Déconnectée</strong>
+        </p>
+        <p>Connectez-vous avec Twitch pour administrer votre giveaway.</p>
+        <a href="/auth/twitch/login">Se connecter avec Twitch</a>
+      </section>
+
+      <section id="connected-state" aria-labelledby="profile-title" hidden>
+        <h2 id="profile-title">Compte Twitch</h2>
+        <img id="streamer-avatar" width="96" height="96" alt="" hidden>
+        <p>
+          <strong id="streamer-display-name"></strong>
+        </p>
+
+        <dl>
+          <dt>Login</dt>
+          <dd id="streamer-login"></dd>
+
+          <dt>Session web</dt>
+          <dd id="session-status"></dd>
+
+          <dt>Streamer actif</dt>
+          <dd id="active-streamer"></dd>
+
+          <dt>Bot global</dt>
+          <dd id="bot-login"></dd>
+
+          <dt>Abonnement au chat</dt>
+          <dd id="chat-status" role="status"></dd>
+        </dl>
+
+        <section aria-labelledby="overlay-title">
+          <h3 id="overlay-title">URL OBS</h3>
+
+          <label for="overlay-url">Adresse de l'overlay</label>
+          <input id="overlay-url" type="url" readonly>
+
+          <button id="copy-overlay-url" type="button">
+            Copier l'URL
+          </button>
+
+          <p id="copy-status" role="status" aria-live="polite"></p>
+        </section>
+
+        <section aria-labelledby="logout-title">
+          <h3 id="logout-title">Session administrative</h3>
+
+          <button id="logout-button" type="button">
+            Se déconnecter de l'administration
+          </button>
+
+          <p id="logout-status" role="alert"></p>
+        </section>
+      </section>
+
+      <p id="admin-error" role="alert" hidden>
+        Impossible de charger l'administration. Réessayez plus tard.
+      </p>
     </main>
   </body>
 </html>

@@ -72,7 +72,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     app.state.oauth_state_store = OAuthStateStore()
     app.state.twitch_oauth_client = twitch_oauth_client
     app.state.giveaway_service = giveaway_service
-    app.state.twitch_chat_ready = False
 
     giveaway_command_handler = GiveawayCommandHandler(
         service=giveaway_service,

@@ -77,11 +77,11 @@ Avec `fluffy` comme streamer actif et `necsus_dev` comme bot :
 ### D. Première page d'administration
 
 - [x] **DEV** : créer `/admin` et afficher un bouton **Se connecter avec Twitch** sans session.
-- [ ] **DEV — EN COURS** : afficher après connexion l'avatar, le nom, le login, le streamer actif et le bot global.
-- [ ] **DEV** : afficher séparément l'état de la session et l'état de l'abonnement au chat.
-- [ ] **DEV** : afficher l'URL OBS actuelle avec une action de copie.
-- [ ] **DEV** : ajouter le bouton de déconnexion sans arrêter le bot ni désactiver le streamer.
-- [ ] **IA** : relire l'accessibilité, les états d'erreur et l'absence de secrets dans le frontend.
+- [x] **DEV** : afficher après connexion l'avatar, le nom, le login, le streamer actif et le bot global.
+- [x] **DEV** : afficher séparément l'état de la session et l'état de l'abonnement au chat.
+- [x] **DEV** : afficher l'URL OBS actuelle avec une action de copie.
+- [x] **DEV** : ajouter le bouton de déconnexion sans arrêter le bot ni désactiver le streamer.
+- [x] **IA** : relire l'accessibilité, les états d'erreur et l'absence de secrets dans le frontend.
 
 #### Validation D
 
@@ -95,7 +95,7 @@ Le nettoyage suit toujours l'ordre **remplacer, valider, puis supprimer** afin d
 
 #### Nettoyage lié à A — identité persistante
 
-- [ ] Après la bascule dynamique de C, retirer `TWITCH_BROADCASTER_ID` et `TWITCH_CHANNEL_LOGIN` de `Settings`, de `.env.example` et du bootstrap JSON.
+- [ ] **DEV — EN COURS** : après la bascule dynamique de C, retirer `TWITCH_BROADCASTER_ID` et `TWITCH_CHANNEL_LOGIN` de `Settings`, de `.env.example` et du bootstrap JSON.
 - [ ] Retirer `broadcaster_id` et `channel_login` de la configuration globale lorsque SQLite est devenue l'unique source de l'identité streamer.
 
 #### Nettoyage lié à B — authentification web

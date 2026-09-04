@@ -54,6 +54,13 @@ class GiveawayTwitchBot(commands.AutoBot):
         self._active_broadcaster_id: str | None = active_broadcaster_id
         self._chat_subscription_id: str | None = None
 
+    @property
+    def chat_subscription_ready(self) -> bool:
+        return (
+            self._active_broadcaster_id is not None
+            and self._chat_subscription_id is not None
+        )
+
     async def subscribe_to_streamer(
         self,
         authorization: TwitchAuthorization,

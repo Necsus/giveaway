@@ -5,7 +5,7 @@ from typing import cast
 
 import aiohttp
 from fastapi import APIRouter, HTTPException, Request, Response, status
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import RedirectResponse
 from twitchio.exceptions import HTTPException as TwitchHTTPException
 from twitchio.exceptions import TwitchioException
 
@@ -53,7 +53,7 @@ async def twitch_callback(
     code: str | None = None,
     state: str | None = None,
     error: str | None = None,
-) -> JSONResponse:
+) -> RedirectResponse:
     oauth_state_store = cast(
         OAuthStateStore,
         request.app.state.oauth_state_store,
@@ -124,7 +124,6 @@ async def twitch_callback(
         GiveawayTwitchBot | None,
         request.app.state.twitch_bot,
     )
-    request.app.state.twitch_chat_ready = False
 
     if twitch_bot is not None:
         try:
@@ -143,8 +142,6 @@ async def twitch_callback(
                 authorization.twitch_user_id,
                 type(subscribe_error).__name__,
             )
-        else:
-            request.app.state.twitch_chat_ready = True
 
     settings = cast(Settings, request.app.state.settings)
     session_signer = cast(
@@ -155,12 +152,9 @@ async def twitch_callback(
         authorization.twitch_user_id,
     )
 
-    response = JSONResponse(
-        content={
-            "twitch_user_id": authorization.twitch_user_id,
-            "login": authorization.login,
-            "display_name": authorization.display_name,
-        }
+    response = RedirectResponse(
+        url="/admin",
+        status_code=status.HTTP_303_SEE_OTHER,
     )
     response.set_cookie(
         key=SESSION_COOKIE_NAME,

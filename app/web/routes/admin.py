@@ -8,6 +8,7 @@ from fastapi.responses import FileResponse
 from app.application.session import SessionIdentity
 from app.core.configuration import ApplicationConfiguration
 from app.infrastructure.streamers import load_active_streamer, load_streamer
+from app.infrastructure.twitch import GiveawayTwitchBot
 from app.web.dependencies import require_session_identity
 
 ADMIN_PAGE = Path(__file__).resolve().parents[1] / "static" / "admin.html"
@@ -26,7 +27,9 @@ def admin_page() -> FileResponse:
 
 
 @router.get("/api/admin/session")
-def admin_session(request: Request, identity: SessionDependency) -> dict[str, object]:
+async def admin_session(
+    request: Request, identity: SessionDependency
+) -> dict[str, object]:
     connection = cast(
         sqlite3.Connection,
         request.app.state.database_connection,
@@ -56,6 +59,18 @@ def admin_session(request: Request, identity: SessionDependency) -> dict[str, ob
         ApplicationConfiguration,
         request.app.state.configuration,
     )
+
+    twitch_bot = cast(
+        GiveawayTwitchBot | None,
+        request.app.state.twitch_bot,
+    )
+    if twitch_bot is None:
+        chat_status = "disabled"
+    elif twitch_bot.chat_subscription_ready:
+        chat_status = "ready"
+    else:
+        chat_status = "degraded"
+
     return {
         "session": {
             "twitch_user_id": streamer.twitch_user_id,
@@ -67,5 +82,8 @@ def admin_session(request: Request, identity: SessionDependency) -> dict[str, ob
         "bot": {
             "twitch_user_id": configuration.twitch.bot_id,
             "login": configuration.twitch.bot_login,
+        },
+        "chat": {
+            "status": chat_status,
         },
     }
