@@ -82,6 +82,7 @@ Avec `fluffy` comme streamer actif et `necsus_dev` comme bot :
 - [x] **DEV** : afficher l'URL OBS actuelle avec une action de copie.
 - [x] **DEV** : ajouter le bouton de déconnexion sans arrêter le bot ni désactiver le streamer.
 - [x] **IA** : relire l'accessibilité, les états d'erreur et l'absence de secrets dans le frontend.
+- [x] **IA** : appliquer un design sombre, minimaliste et responsive à la page d'administration, sans dépendance frontend externe.
 
 #### Validation D
 

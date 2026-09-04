@@ -1,17 +1,20 @@
+const loadingState = document.querySelector("#loading-state");
 const disconnectedState = document.querySelector("#disconnected-state");
 const connectedState = document.querySelector("#connected-state");
 const adminError = document.querySelector("#admin-error");
 const streamerAvatar = document.querySelector("#streamer-avatar");
+const avatarFallback = document.querySelector("#avatar-fallback");
 const streamerDisplayName = document.querySelector("#streamer-display-name");
 const streamerLogin = document.querySelector("#streamer-login");
 const activeStreamer = document.querySelector("#active-streamer");
 const botLogin = document.querySelector("#bot-login");
-const sessionStatus = document.querySelector("#session-status");
 const chatStatus = document.querySelector("#chat-status");
 const overlayUrlInput = document.querySelector("#overlay-url");
 const copyOverlayUrlButton = document.querySelector("#copy-overlay-url");
+const copyButtonLabel = copyOverlayUrlButton.querySelector("span");
 const copyStatus = document.querySelector("#copy-status");
 const logoutButton = document.querySelector("#logout-button");
+const retryButton = document.querySelector("#retry-button");
 const logoutStatus = document.querySelector("#logout-status");
 
 const chatStatusLabels = {
@@ -30,12 +33,21 @@ copyOverlayUrlButton.addEventListener("click", async () => {
 
   try {
     await navigator.clipboard.writeText(overlayUrlInput.value);
-    copyStatus.textContent = "URL copiée.";
+    copyButtonLabel.textContent = "Copiée";
+    copyStatus.textContent = "URL copiée dans le presse-papiers.";
+
+    window.setTimeout(() => {
+      copyButtonLabel.textContent = "Copier";
+    }, 2000);
   } catch {
     overlayUrlInput.focus();
     overlayUrlInput.select();
     copyStatus.textContent = "Copie impossible. L'URL a été sélectionnée pour une copie manuelle.";
   }
+});
+
+retryButton.addEventListener("click", () => {
+  window.location.reload();
 });
 
 logoutButton.addEventListener("click", async () => {
@@ -63,12 +75,14 @@ logoutButton.addEventListener("click", async () => {
 });
 
 function showDisconnectedState() {
+  loadingState.hidden = true;
   disconnectedState.hidden = false;
   connectedState.hidden = true;
   adminError.hidden = true;
 }
 
 function showErrorState() {
+  loadingState.hidden = true;
   disconnectedState.hidden = true;
   connectedState.hidden = true;
   adminError.hidden = false;
@@ -79,17 +93,19 @@ function showConnectedState(data) {
 
   streamerDisplayName.textContent = session.display_name;
   streamerLogin.textContent = `@${session.login}`;
-  sessionStatus.textContent = "Connectée";
   chatStatus.textContent = chatStatusLabels[data.chat.status] ?? "Inconnu";
+  chatStatus.dataset.status = data.chat.status;
 
   if (session.profile_image_url) {
     streamerAvatar.src = session.profile_image_url;
     streamerAvatar.alt = `Avatar Twitch de ${session.display_name}`;
     streamerAvatar.hidden = false;
+    avatarFallback.hidden = true;
   } else {
     streamerAvatar.removeAttribute("src");
     streamerAvatar.alt = "";
     streamerAvatar.hidden = true;
+    avatarFallback.hidden = false;
   }
 
   if (data.active_streamer === null) {
@@ -102,10 +118,16 @@ function showConnectedState(data) {
 
   botLogin.textContent = `@${data.bot.login}`;
 
+  loadingState.hidden = true;
   disconnectedState.hidden = true;
   connectedState.hidden = false;
   adminError.hidden = true;
 }
+
+streamerAvatar.addEventListener("error", () => {
+  streamerAvatar.hidden = true;
+  avatarFallback.hidden = false;
+});
 
 async function loadAdminSession() {
   try {

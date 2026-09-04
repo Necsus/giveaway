@@ -3,74 +3,174 @@
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#0f0f12">
+    <link rel="stylesheet" href="/static/admin.css">
     <script src="/static/admin.js" defer></script>
     <title>Administration du giveaway</title>
   </head>
   <body>
-    <main>
-      <h1>Administration du giveaway</h1>
+    <div class="page-shell">
+      <header class="site-header">
+        <a class="brand" href="/admin" aria-label="Giveaway — Administration">
+          <span class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" role="img">
+              <path d="M4 10h16v10H4zM3 6h18v4H3zM12 6v14M7.5 6C5 6 4.5 2.5 7 2.5c3 0 5 3.5 5 3.5m4.5 0C19 6 19.5 2.5 17 2.5c-3 0-5 3.5-5 3.5"/>
+            </svg>
+          </span>
+          <span>Giveaway</span>
+        </a>
+        <span class="header-label">Administration</span>
+      </header>
 
-      <section id="disconnected-state" aria-labelledby="connection-title">
-        <h2 id="connection-title">Connexion Twitch</h2>
-        <p>
-          Session Web :
-          <strong>Déconnectée</strong>
-        </p>
-        <p>Connectez-vous avec Twitch pour administrer votre giveaway.</p>
-        <a href="/auth/twitch/login">Se connecter avec Twitch</a>
-      </section>
+      <main class="main-content" aria-labelledby="page-title">
+        <div class="page-heading">
+          <p class="eyebrow">Tableau de bord</p>
+          <h1 id="page-title">Votre espace giveaway</h1>
+          <p class="page-description">
+            Gérez votre connexion Twitch et retrouvez les informations utiles à votre diffusion.
+          </p>
+        </div>
 
-      <section id="connected-state" aria-labelledby="profile-title" hidden>
-        <h2 id="profile-title">Compte Twitch</h2>
-        <img id="streamer-avatar" width="96" height="96" alt="" hidden>
-        <p>
-          <strong id="streamer-display-name"></strong>
-        </p>
-
-        <dl>
-          <dt>Login</dt>
-          <dd id="streamer-login"></dd>
-
-          <dt>Session web</dt>
-          <dd id="session-status"></dd>
-
-          <dt>Streamer actif</dt>
-          <dd id="active-streamer"></dd>
-
-          <dt>Bot global</dt>
-          <dd id="bot-login"></dd>
-
-          <dt>Abonnement au chat</dt>
-          <dd id="chat-status" role="status"></dd>
-        </dl>
-
-        <section aria-labelledby="overlay-title">
-          <h3 id="overlay-title">URL OBS</h3>
-
-          <label for="overlay-url">Adresse de l'overlay</label>
-          <input id="overlay-url" type="url" readonly>
-
-          <button id="copy-overlay-url" type="button">
-            Copier l'URL
-          </button>
-
-          <p id="copy-status" role="status" aria-live="polite"></p>
+        <section id="loading-state" class="panel loading-panel" aria-label="Chargement de la session">
+          <span class="spinner" aria-hidden="true"></span>
+          <p>Chargement de votre espace…</p>
         </section>
 
-        <section aria-labelledby="logout-title">
-          <h3 id="logout-title">Session administrative</h3>
-
-          <button id="logout-button" type="button">
-            Se déconnecter de l'administration
-          </button>
-
-          <p id="logout-status" role="alert"></p>
+        <section id="disconnected-state" class="panel auth-panel" aria-labelledby="connection-title" hidden>
+          <div class="auth-visual" aria-hidden="true">
+            <svg viewBox="0 0 24 24" role="img">
+              <path d="M5 3h16v11l-5 5h-4l-3 3v-3H5V3Z"/>
+              <path d="M9 7v6m5-6v6"/>
+            </svg>
+          </div>
+          <div class="auth-content">
+            <span class="status-pill status-neutral">
+              <span class="status-dot"></span>
+              Session déconnectée
+            </span>
+            <h2 id="connection-title">Connectez votre compte Twitch</h2>
+            <p>
+              Identifiez-vous pour accéder aux informations de votre chaîne et configurer votre source OBS.
+            </p>
+            <a class="button button-primary" href="/auth/twitch/login">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M5 3h16v11l-5 5h-4l-3 3v-3H5V3Z"/>
+                <path d="M9 7v6m5-6v6"/>
+              </svg>
+              Se connecter avec Twitch
+            </a>
+          </div>
         </section>
-      </section>
 
-      <p id="admin-error" role="alert" hidden>
-        Impossible de charger l'administration. Réessayez plus tard.
-      </p>
-    </main>
+        <section id="connected-state" class="dashboard" aria-labelledby="profile-title" hidden>
+          <div class="panel profile-panel">
+            <div class="profile-identity">
+              <div class="avatar-frame">
+                <img id="streamer-avatar" width="72" height="72" alt="" hidden>
+                <span id="avatar-fallback" aria-hidden="true">
+                  <svg viewBox="0 0 24 24">
+                    <path d="M20 21a8 8 0 0 0-16 0m12-13a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z"/>
+                  </svg>
+                </span>
+              </div>
+              <div>
+                <p class="section-kicker">Compte Twitch</p>
+                <h2 id="profile-title"><span id="streamer-display-name"></span></h2>
+                <p id="streamer-login" class="profile-login"></p>
+              </div>
+            </div>
+            <span class="status-pill status-success">
+              <span class="status-dot"></span>
+              Session connectée
+            </span>
+          </div>
+
+          <dl class="status-grid" aria-label="État des services">
+            <div class="status-card">
+              <div class="status-card-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M4 5h16v12H4zM8 21h8m-4-4v4M8 9h8m-8 4h5"/></svg>
+              </div>
+              <div>
+                <dt>Streamer actif</dt>
+                <dd id="active-streamer"></dd>
+              </div>
+            </div>
+
+            <div class="status-card">
+              <div class="status-card-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M12 3v3m-5.5.5 2.1 2.1M3 12h3m.5 5.5 2.1-2.1M12 18v3m5.5-3.5-2.1-2.1M18 12h3m-3.5-5.5-2.1 2.1M16 12a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z"/></svg>
+              </div>
+              <div>
+                <dt>Bot global</dt>
+                <dd id="bot-login"></dd>
+              </div>
+            </div>
+
+            <div class="status-card">
+              <div class="status-card-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M5 12.5 9.5 17 19 7.5"/></svg>
+              </div>
+              <div>
+                <dt>Abonnement au chat</dt>
+                <dd><span id="chat-status" class="service-status" role="status"></span></dd>
+              </div>
+            </div>
+          </dl>
+
+          <section class="panel obs-panel" aria-labelledby="overlay-title">
+            <div class="section-heading">
+              <div class="section-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M4 5h16v14H4zM8 9h8m-8 4h5"/></svg>
+              </div>
+              <div>
+                <p class="section-kicker">Source navigateur</p>
+                <h3 id="overlay-title">URL de l’overlay OBS</h3>
+              </div>
+            </div>
+            <p class="section-description">
+              Ajoutez cette adresse comme source navigateur dans OBS pour afficher le giveaway à l’écran.
+            </p>
+            <label class="sr-only" for="overlay-url">Adresse de l’overlay</label>
+            <div class="copy-field">
+              <input id="overlay-url" type="url" readonly>
+              <button id="copy-overlay-url" class="button button-secondary" type="button">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 9h10v11H9zM5 15H4V4h10v1"/></svg>
+                <span>Copier</span>
+              </button>
+            </div>
+            <p id="copy-status" class="feedback" role="status" aria-live="polite"></p>
+          </section>
+
+          <section class="session-footer" aria-labelledby="logout-title">
+            <div>
+              <h3 id="logout-title">Session administrative</h3>
+              <p>La déconnexion ne coupe pas le giveaway en cours.</p>
+            </div>
+            <button id="logout-button" class="button button-ghost" type="button">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 5H5v14h5m4-3 4-4-4-4m4 4H9"/></svg>
+              Se déconnecter
+            </button>
+            <p id="logout-status" class="feedback feedback-error" role="alert"></p>
+          </section>
+        </section>
+
+        <section id="admin-error" class="panel error-panel" role="alert" hidden>
+          <div class="error-icon" aria-hidden="true">!</div>
+          <div>
+            <h2>Impossible de charger l’administration</h2>
+            <p>Vérifiez votre connexion puis actualisez la page.</p>
+          </div>
+          <button id="retry-button" class="button button-secondary" type="button">
+            Réessayer
+          </button>
+        </section>
+      </main>
+
+      <footer class="site-footer">
+        <span>Giveaway Dashboard</span>
+        <span aria-hidden="true">·</span>
+        <span>Propulsé par Twitch</span>
+      </footer>
+    </div>
   </body>
 </html>
