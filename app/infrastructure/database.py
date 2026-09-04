@@ -23,6 +23,7 @@ def initialize_database(connection: sqlite3.Connection) -> None:
             twitch_user_id TEXT PRIMARY KEY NOT NULL,
             login TEXT NOT NULL UNIQUE,
             display_name TEXT NOT NULL,
+            profile_image_url TEXT NOT NULL DEFAULT '',
             enabled INTEGER NOT NULL CHECK (enabled IN (0, 1)),
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
@@ -73,4 +74,23 @@ def initialize_database(connection: sqlite3.Connection) -> None:
         """
     )
     cursor.close()
+    cursor = connection.execute(
+        """
+        SELECT 1
+        FROM pragma_table_info('streamers')
+        WHERE name = 'profile_image_url';
+        """
+    )
+    has_profile_image_url = cursor.fetchone() is not None
+    cursor.close()
+
+    if not has_profile_image_url:
+        cursor = connection.execute(
+            """
+            ALTER TABLE streamers
+            ADD COLUMN profile_image_url TEXT NOT NULL DEFAULT '';
+            """
+        )
+        cursor.close()
+
     connection.commit()

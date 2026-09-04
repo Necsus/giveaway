@@ -15,6 +15,7 @@ class TwitchAuthorization:
     twitch_user_id: str
     login: str
     display_name: str
+    profile_image_url: str
     scopes: frozenset[str]
     access_token: str = field(repr=False)
     refresh_token: str = field(repr=False)
@@ -51,7 +52,7 @@ class TwitchOAuthClient:
         if REQUIRED_STREAMER_SCOPE not in scopes:
             raise ValueError("The OAuth token is missing the channel:bot scope")
 
-        login, display_name = await self._fetch_profile(
+        login, display_name, profile_image_url = await self._fetch_profile(
             access_token=token_payload.access_token,
             expected_user_id=validated_token.user_id,
         )
@@ -60,6 +61,7 @@ class TwitchOAuthClient:
             twitch_user_id=validated_token.user_id,
             login=login,
             display_name=display_name,
+            profile_image_url=profile_image_url,
             scopes=scopes,
             access_token=token_payload.access_token,
             refresh_token=token_payload.refresh_token,
@@ -69,7 +71,7 @@ class TwitchOAuthClient:
         self,
         access_token: str,
         expected_user_id: str,
-    ) -> tuple[str, str]:
+    ) -> tuple[str, str, str]:
         headers = {
             "Authorization": f"Bearer {access_token}",
             "Client-Id": self._client_id,
@@ -97,6 +99,7 @@ class TwitchOAuthClient:
         twitch_user_id = profile.get("id")
         login = profile.get("login")
         display_name = profile.get("display_name")
+        profile_image_url = profile.get("profile_image_url")
 
         if twitch_user_id != expected_user_id:
             raise ValueError("The Twitch profile does not match the OAuth identity")
@@ -107,7 +110,10 @@ class TwitchOAuthClient:
         if not isinstance(display_name, str) or not display_name.strip():
             raise ValueError("The Twitch profile has no valid display name")
 
-        return login, display_name
+        if not isinstance(profile_image_url, str):
+            raise TypeError("The Twitch profile has no valid profile image URL")
+
+        return login, display_name, profile_image_url
 
     async def close(self) -> None:
         await self._oauth.close()

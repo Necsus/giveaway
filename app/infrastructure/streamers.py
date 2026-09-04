@@ -10,6 +10,7 @@ def save_active_streamer(
     twitch_user_id: str,
     login: str,
     display_name: str,
+    profile_image_url: str,
 ) -> None:
     now = datetime.now(UTC).isoformat()
 
@@ -30,18 +31,20 @@ def save_active_streamer(
                 twitch_user_id,
                 login,
                 display_name,
+                profile_image_url,
                 enabled,
                 created_at,
                 updated_at
             )
-            VALUES (?, ?, ?, 1, ?, ?)
+            VALUES (?, ?, ?, ?, 1, ?, ?)
             ON CONFLICT (twitch_user_id) DO UPDATE SET
                 login = excluded.login,
                 display_name = excluded.display_name,
+                profile_image_url = excluded.profile_image_url,
                 enabled = excluded.enabled,
                 updated_at = excluded.updated_at
             """,
-            (twitch_user_id, login, display_name, now, now),
+            (twitch_user_id, login, display_name, profile_image_url, now, now),
         )
         cursor.close()
 
@@ -56,7 +59,7 @@ def load_active_streamer(
 ) -> Streamer | None:
     cursor = connection.execute(
         """
-        SELECT twitch_user_id, login, display_name
+        SELECT twitch_user_id, login, display_name, profile_image_url
         FROM streamers
         WHERE enabled = 1
         LIMIT 1;
@@ -72,4 +75,5 @@ def load_active_streamer(
         twitch_user_id=cast(str, row["twitch_user_id"]),
         login=cast(str, row["login"]),
         display_name=cast(str, row["display_name"]),
+        profile_image_url=cast(str, row["profile_image_url"]),
     )

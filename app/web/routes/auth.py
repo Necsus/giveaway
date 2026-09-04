@@ -94,6 +94,7 @@ async def twitch_callback(
             twitch_user_id=authorization.twitch_user_id,
             login=authorization.login,
             display_name=authorization.display_name,
+            profile_image_url=authorization.profile_image_url,
         )
     except ValueError:
         raise HTTPException(
