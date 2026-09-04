@@ -95,12 +95,12 @@ Le nettoyage suit toujours l'ordre **remplacer, valider, puis supprimer** afin d
 
 #### Nettoyage lié à A — identité persistante
 
-- [ ] **DEV — EN COURS** : après la bascule dynamique de C, retirer `TWITCH_BROADCASTER_ID` et `TWITCH_CHANNEL_LOGIN` de `Settings`, de `.env.example` et du bootstrap JSON.
-- [ ] Retirer `broadcaster_id` et `channel_login` de la configuration globale lorsque SQLite est devenue l'unique source de l'identité streamer.
+- [x] **DEV** : après la bascule dynamique de C, retirer `TWITCH_BROADCASTER_ID` et `TWITCH_CHANNEL_LOGIN` de `Settings`, de `.env.example` et du bootstrap JSON.
+- [x] **DEV** : retirer `broadcaster_id` et `channel_login` de la configuration globale lorsque SQLite est devenue l'unique source de l'identité streamer.
 
 #### Nettoyage lié à B — authentification web
 
-- [ ] Fournir et valider un mécanisme de bootstrap unique pour l'autorisation initiale du bot global.
+- [ ] **DEV — EN COURS** : fournir et valider un mécanisme de bootstrap unique pour l'autorisation initiale du bot global.
 - [ ] Après ce remplacement, supprimer l'adaptateur OAuth local TwitchIO, `TWITCH_OAUTH_ENABLED`, l'option `with_adapter` et le callback `localhost:4343`.
 - [ ] Supprimer du README et de la spécification le tunnel SSH sur le port `4343` et les anciennes instructions d'autorisation.
 - [ ] Vérifier que `/auth/twitch/callback` est le seul callback OAuth utilisé pour les streamers.

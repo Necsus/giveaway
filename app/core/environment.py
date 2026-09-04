@@ -23,10 +23,8 @@ class Settings(BaseSettings):
 
     twitch_bot_id: str
     twitch_owner_id: str
-    twitch_broadcaster_id: str
 
     twitch_bot_login: str
-    twitch_channel_login: str
 
     twitch_admin_redirect_uri: str
     session_secret: SecretStr
