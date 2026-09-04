@@ -1,4 +1,5 @@
 import urllib.parse
+from collections.abc import Collection
 from dataclasses import dataclass, field
 from typing import cast
 
@@ -7,7 +8,14 @@ from twitchio import authentication
 
 TWITCH_AUTHORIZE_URL = "https://id.twitch.tv/oauth2/authorize"
 TWITCH_USERS_URL = "https://api.twitch.tv/helix/users"
-REQUIRED_STREAMER_SCOPE = "channel:bot"
+BOT_SCOPE_NAMES = frozenset(
+    {
+        "user:bot",
+        "user:read:chat",
+        "user:write:chat",
+    }
+)
+STREAMER_SCOPE_NAMES = frozenset({"channel:bot"})
 
 
 @dataclass(frozen=True)
@@ -35,7 +43,11 @@ class TwitchOAuthClient:
             redirect_uri=redirect_uri,
         )
 
-    async def exchange_code(self, code: str) -> TwitchAuthorization:
+    async def exchange_code(
+        self,
+        code: str,
+        required_scopes: Collection[str],
+    ) -> TwitchAuthorization:
         if not code.strip():
             raise ValueError("The OAuth authorization code cannot be empty")
 
@@ -49,8 +61,8 @@ class TwitchOAuthClient:
             raise ValueError("The OAuth token has no Twitch user identity")
 
         scopes = frozenset(validated_token.scopes)
-        if REQUIRED_STREAMER_SCOPE not in scopes:
-            raise ValueError("The OAuth token is missing the channel:bot scope")
+        if not set(required_scopes).issubset(scopes):
+            raise ValueError("The OAuth token is missing a required scope")
 
         login, display_name, profile_image_url = await self._fetch_profile(
             access_token=token_payload.access_token,
@@ -112,6 +124,7 @@ class TwitchOAuthClient:
 
         if not isinstance(profile_image_url, str):
             raise TypeError("The Twitch profile has no valid profile image URL")
+
         return login, display_name, profile_image_url
 
     async def close(self) -> None:
@@ -122,14 +135,20 @@ def build_authorization_url(
     client_id: str,
     redirect_uri: str,
     state: str,
+    scopes: Collection[str],
+    *,
+    force_verify: bool = False,
 ) -> str:
     params = {
         "response_type": "code",
         "client_id": client_id,
         "redirect_uri": redirect_uri,
-        "scope": "channel:bot",
+        "scope": " ".join(sorted(scopes)),
         "state": state,
     }
+
+    if force_verify:
+        params["force_verify"] = "true"
 
     query_string = urllib.parse.urlencode(params)
 

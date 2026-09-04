@@ -25,7 +25,7 @@ Le socle local est actuellement opérationnel :
 - gestion de plusieurs connexions WebSocket ;
 - overlay HTML/JavaScript sans thème avec reconnexion automatique.
 
-Le fonctionnement actuel reste mono-streamer avec un bot et un broadcaster configurés au démarrage. L'étape active introduit un bot global fixe et un seul streamer dynamique connecté par `/admin`. Le `broadcaster_id` et le canal écouté proviendront de l'identité Twitch validée par OAuth, jamais du navigateur. L'isolation de plusieurs streamers simultanés viendra après cette étape. Les tests automatisés sont reportés ; les contrôles actuels sont manuels et complétés par Ruff et BasedPyright.
+Le fonctionnement actuel reste mono-streamer, avec un bot global fixe et un seul streamer dynamique connecté par `/admin`. Le `broadcaster_id` autorisé et le canal écouté proviennent de l'identité Twitch persistée dans SQLite après validation OAuth, jamais du navigateur ni de la configuration globale. L'isolation de plusieurs streamers simultanés viendra après cette étape. Les tests automatisés sont reportés ; les contrôles actuels sont manuels et complétés par Ruff et BasedPyright.
 
 ### Étape intermédiaire retenue
 
@@ -134,14 +134,15 @@ app/
 │   └── twitch.py                   # OAuth, EventSub et écoute Twitch
 └── web/
     ├── websocket.py                # connexions et diffusion de l'état
-    ├── routes/                     # extraction future des routes de main.py
-    │   ├── overlay.py              # page et WebSocket de l'overlay, à créer
-    │   └── admin.py                # administration protégée, à créer
+    ├── routes/
+    │   ├── overlay.py              # page et WebSocket de l'overlay
+    │   ├── admin.py                # page et API d'administration protégée
+    │   └── auth.py                 # OAuth Twitch et session web
     └── static/
         ├── overlay.html            # squelette de l'overlay
         ├── overlay.js              # réception et rendu de l'état
-        ├── admin.html              # interface d'administration, à créer
-        └── admin.js                # logique d'administration, à créer
+        ├── admin.html              # interface d'administration
+        └── admin.js                # logique d'administration
 
 .env.example                  # modèle versionné avec valeurs fictives
 requirements.txt              # dépendances Python épinglées
@@ -283,8 +284,9 @@ L'accès réseau Tailscale constitue la première barrière. Tout membre du tail
 | Méthode | Chemin | Usage |
 |---|---|---|
 | `GET` | `/admin` | Affiche le bouton Twitch ou l'espace du streamer connecté. |
-| `GET` | `/auth/twitch/login` | Démarre OAuth avec un état anti-CSRF. |
-| `GET` | `/auth/twitch/callback` | Valide OAuth, enregistre le streamer et ouvre la session. |
+| `GET` | `/auth/twitch/login` | Démarre OAuth streamer avec un état anti-CSRF. |
+| `GET` | `/auth/twitch/bot/login` | Autorise ou réautorise le bot global configuré. |
+| `GET` | `/auth/twitch/callback` | Valide le flux OAuth bot ou streamer à partir de l'état à usage unique. |
 | `POST` | `/auth/logout` | Ferme la session. |
 | `GET` | `/api/admin/settings` | Lit les réglages du streamer connecté. |
 | `PUT` | `/api/admin/settings` | Valide et enregistre ses réglages. |
@@ -314,17 +316,17 @@ L'identifiant Twitch du streamer provient uniquement d'OAuth et n'est pas modifi
 
 ### Configuration locale actuelle
 
-Le développement local utilise un fichier `.env` à la racine, chargé par `pydantic-settings`. Il contient les secrets, les options de bootstrap et le chemin du fichier JSON. Les identifiants, logins, préfixe et état d'activation Twitch servent à initialiser `settings.json` lorsque celui-ci n'existe pas encore.
+Le développement local utilise un fichier `.env` à la racine, chargé par `pydantic-settings`. Il contient les secrets, le callback HTTPS, les identifiants globaux du bot et le chemin du fichier JSON. L'identité streamer n'y figure plus. Les réglages globaux servent à initialiser `settings.json` lorsque celui-ci n'existe pas encore.
 
-Le Client Secret est représenté avec `SecretStr`. Le fichier `.env` réel reste ignoré par Git et ne doit jamais être lu, affiché ou journalisé. `.env.example` documente les noms attendus avec des valeurs fictives. Les access tokens et refresh tokens ne sont pas saisis manuellement : ils sont obtenus pendant le parcours OAuth TwitchIO, sauvegardés dans `.tio.tokens.json` et rechargés au démarrage. Ce fichier est ignoré par Git et ne doit jamais être lu, affiché ou partagé.
+Le Client Secret est représenté avec `SecretStr`. Le fichier `.env` réel reste ignoré par Git et ne doit jamais être lu, affiché ou journalisé. `.env.example` documente les noms attendus avec des valeurs fictives. Les access tokens et refresh tokens ne sont pas saisis manuellement : ils sont obtenus par les parcours OAuth FastAPI, confiés à TwitchIO, sauvegardés dans `.tio.tokens.json` et rechargés au démarrage. Ce fichier est ignoré par Git et ne doit jamais être lu, affiché ou partagé.
 
 `Settings` et `ConfigurationStore` sont créés dans le cycle de vie FastAPI. Si le JSON est absent, une configuration initiale est construite depuis `.env` puis enregistrée. Lors des démarrages suivants, le JSON validé devient prioritaire pour les réglages non secrets. Le gestionnaire de commandes et le connecteur TwitchIO utilisent cette configuration effective.
 
-L'adaptateur OAuth reste contrôlé séparément par `TWITCH_OAUTH_ENABLED` dans `.env` et désactivé en fonctionnement normal. Pour le développement distant, il écoute alors sur `localhost:4343` et peut être transmis avec un tunnel SSH. L'application Twitch déclare `http://localhost:4343/oauth/callback` comme URL de redirection.
+Le bot global est autorisé depuis `/auth/twitch/bot/login` avec `user:read:chat`, `user:write:chat` et `user:bot`. Le callback HTTPS `/auth/twitch/callback` valide que l'identité obtenue correspond au `bot_id` configuré, puis demande à TwitchIO de sauvegarder immédiatement le token. Le même callback traite le flux streamer `channel:bot` avec un état OAuth distinct.
 
 ### Configuration JSON administrable
 
-Le modèle Pydantic, le stockage JSON atomique et leur injection dans le cycle de vie FastAPI sont implémentés pour le mode mono-streamer actuel. La migration multi-streamer fera évoluer ce JSON vers une configuration globale du bot ; les réglages propres aux streamers seront déplacés dans SQLite.
+Le modèle Pydantic version 2, le stockage JSON atomique et leur injection dans le cycle de vie FastAPI sont implémentés. Le JSON est limité à la configuration globale du bot ; l'identité du streamer actif est déjà stockée dans SQLite.
 
 Emplacement local par défaut :
 
@@ -338,7 +340,7 @@ Emplacement cible pour le service NixOS :
 /var/lib/giveaway/settings.json
 ```
 
-Structure cible après migration :
+Structure globale actuelle :
 
 ```json
 {
@@ -350,7 +352,7 @@ Structure cible après migration :
     "bot_login": "mon_bot"
   },
   "commands": {
-    "default_prefix": "!"
+    "prefix": "!"
   }
 }
 ```
@@ -384,6 +386,7 @@ Emplacement proposé :
 | `twitch_user_id` | TEXT, clé primaire | Identifiant Twitch stable obtenu par OAuth. |
 | `login` | TEXT, unique | Login Twitch utilisé dans l'URL d'overlay. |
 | `display_name` | TEXT | Nom affiché actualisé à la connexion. |
+| `profile_image_url` | TEXT | URL publique de l'avatar actualisée à la connexion. |
 | `enabled` | INTEGER | Active ou désactive les abonnements du streamer ; une contrainte partielle limite cette valeur à un seul streamer pendant l'étape mono-streamer dynamique. |
 | `command_prefix` | TEXT | Préfixe de commandes propre au streamer. |
 | `created_at` | TEXT | Date UTC de création de l'espace. |
@@ -601,10 +604,10 @@ Les tests automatisés décrits ci-dessous restent l'objectif avant la fin du MV
 7. [x] Injection de `Settings` dans le cycle de vie FastAPI.
 8. [x] Autorisation OAuth et connexion au chat Twitch.
 9. [x] Modèle et stockage atomique de la configuration JSON mono-streamer.
-10. [ ] **EN COURS** : table SQLite et persistance d'un streamer actif unique.
-11. [ ] Authentification Twitch dans FastAPI, état OAuth et session signée.
-12. [ ] Souscription dynamique du bot global au chat du streamer actif.
-13. [ ] Première page `/admin` : identité, bot, état du chat, URL OBS et déconnexion.
+10. [x] Table SQLite et persistance d'un streamer actif unique.
+11. [x] Authentification Twitch dans FastAPI, état OAuth et session signée.
+12. [x] Souscription dynamique du bot global au chat du streamer actif.
+13. [x] Première page `/admin` : identité, bot, état du chat, URL OBS et déconnexion.
 14. [ ] Réduction des payloads et diffusion WebSocket non bloquante avec backpressure.
 15. [ ] SQLite WAL, accès non bloquant et cohérence transactionnelle mémoire/base.
 16. [ ] Supervision TwitchIO, santé `live`/`ready` et limites de ressources.

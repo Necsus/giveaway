@@ -2,7 +2,7 @@
 
 Overlay de giveaway pour Twitch, affiché dans OBS comme source navigateur et piloté directement depuis le chat.
 
-> Le parcours Twitch complet est fonctionnel avec une chaîne configurée au démarrage. La priorité active est une page `/admin` où un streamer choisit dynamiquement sa chaîne avec Twitch OAuth, tandis que le compte bot reste global et fixe. Plusieurs streamers simultanés viendront ensuite.
+> Le parcours Twitch complet est fonctionnel avec un bot global fixe et un streamer actif choisi dynamiquement depuis `/admin` avec Twitch OAuth. Plusieurs streamers simultanés viendront ensuite.
 
 ## Fonctionnalités
 
@@ -55,7 +55,7 @@ La première évolution conserve un seul giveaway actif, mais sépare les identi
 - le bot global écoute le chat de ce streamer avec EventSub ;
 - changer de streamer remplace l'unique canal actif.
 
-Le premier tableau de bord affichera l'identité Twitch, le bot utilisé, l'état de l'abonnement au chat, l'URL OBS et la déconnexion.
+Le tableau de bord affiche l'identité Twitch, le bot utilisé, l'état de l'abonnement au chat, l'URL OBS et la déconnexion.
 
 ## Cible multi-streamer
 
@@ -106,30 +106,26 @@ Sous PowerShell, utilise `\.venv\Scripts\Activate.ps1` et `Copy-Item .env.exampl
 | `http://127.0.0.1:8000/overlay` | Source navigateur OBS |
 | `http://127.0.0.1:8000/docs` | Documentation OpenAPI |
 
-Sur le tailnet, MagicDNS permet par exemple d’utiliser `http://forge:8000/overlay`.
+Avec Tailscale Serve, le service est disponible en HTTPS privé, par exemple sur `https://forge.<tailnet>.ts.net/overlay`.
 
 ## Autorisation Twitch
 
-L’application créée dans la console Twitch doit déclarer cette URL de redirection :
+L’application créée dans la console Twitch doit déclarer le callback HTTPS de l’administration, par exemple :
 
 ```text
-http://localhost:4343/oauth/callback
+https://forge.<tailnet>.ts.net/auth/twitch/callback
 ```
 
-Pour autoriser ou réautoriser un compte :
+Le bot global et le streamer utilisent ce callback unique, avec des états OAuth distincts, courts et à usage unique.
 
-1. définir temporairement `TWITCH_OAUTH_ENABLED=true` ;
-2. démarrer le service ;
-3. transmettre le port depuis une DevBox distante si nécessaire :
+Pour autoriser ou réautoriser le bot configuré :
 
-   ```bash
-   ssh -L 4343:127.0.0.1:4343 utilisateur@devbox
-   ```
+1. démarrer le service avec Twitch activé ;
+2. ouvrir `https://forge.<tailnet>.ts.net/auth/twitch/bot/login` ;
+3. se connecter avec le compte bot configuré ;
+4. accepter `user:read:chat`, `user:write:chat` et `user:bot`.
 
-4. ouvrir l’URL OAuth avec les scopes adaptés ;
-5. remettre `TWITCH_OAUTH_ENABLED=false` après l’autorisation.
-
-Le mode actuel peut encore utiliser un compte unique. L'étape active sépare les autorisations : le bot global est autorisé une fois avec `user:read:chat`, `user:write:chat` et `user:bot`, puis le streamer connecté sur `/admin` accorde `channel:bot`. Les tokens OAuth ne sont jamais stockés dans SQLite ni envoyés au navigateur.
+Le callback refuse toute identité différente du `bot_id` configuré et TwitchIO sauvegarde immédiatement le token dans son stockage local ignoré par Git. Le streamer ouvre ensuite `/admin` et accorde `channel:bot`. Les tokens OAuth ne sont jamais stockés dans SQLite ni envoyés au navigateur.
 
 ## OBS
 

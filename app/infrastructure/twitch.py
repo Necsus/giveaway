@@ -8,15 +8,11 @@ from typing_extensions import override
 from app.application.commands import ChatUser, GiveawayCommandHandler
 from app.core.configuration import ApplicationConfiguration
 from app.core.environment import Settings
-from app.infrastructure.twitch_oauth import TwitchAuthorization
+from app.infrastructure.twitch_oauth import BOT_SCOPE_NAMES, TwitchAuthorization
 
 LOGGER = logging.getLogger("uvicorn.error")
 
-BOT_SCOPES = authentication.Scopes(
-    user_read_chat=True,
-    user_write_chat=True,
-    user_bot=True,
-)
+BOT_SCOPES = authentication.Scopes(BOT_SCOPE_NAMES)
 
 
 class GiveawayTwitchBot(commands.AutoBot):
@@ -61,6 +57,26 @@ class GiveawayTwitchBot(commands.AutoBot):
             and self._chat_subscription_id is not None
         )
 
+    async def authorize_bot(self, authorization: TwitchAuthorization) -> None:
+        if authorization.twitch_user_id != self.bot_id:
+            raise ValueError("The Twitch authorization does not belong to the bot")
+
+        if not BOT_SCOPE_NAMES.issubset(authorization.scopes):
+            raise ValueError("The Twitch bot authorization is missing a required scope")
+
+        validated_token = await self.add_token(
+            authorization.access_token,
+            authorization.refresh_token,
+        )
+        if validated_token.user_id != self.bot_id:
+            if validated_token.user_id is not None:
+                _ = await self.remove_token(validated_token.user_id)
+
+            raise ValueError("The added Twitch token does not belong to the bot")
+
+        await self.save_tokens()
+        LOGGER.info("Twitch bot authorization saved: bot_id=%s", self.bot_id)
+
     async def subscribe_to_streamer(
         self,
         authorization: TwitchAuthorization,
@@ -85,14 +101,17 @@ class GiveawayTwitchBot(commands.AutoBot):
             ):
                 return
 
-            previous_subscription_id = self._chat_subscription_id
-
-            # Bloque immédiatement les évènements de l'ancien canal
+            # Bloque immédiatement les évènements de l'ancien canal.
             self._active_broadcaster_id = None
             self._chat_subscription_id = None
 
-            if previous_subscription_id is not None:
-                await self.delete_eventsub_subscription(previous_subscription_id)
+            existing_subscription_id = await self._reconcile_chat_subscriptions(
+                authorization.twitch_user_id
+            )
+            if existing_subscription_id is not None:
+                self._chat_subscription_id = existing_subscription_id
+                self._active_broadcaster_id = authorization.twitch_user_id
+                return
 
             subscription = eventsub.ChatMessageSubscription(
                 broadcaster_user_id=authorization.twitch_user_id,
@@ -139,28 +158,46 @@ class GiveawayTwitchBot(commands.AutoBot):
 
         _ = await self._command_handler.handle(payload.text, author)
 
-    @override
-    async def event_oauth_authorized(
+    async def _reconcile_chat_subscriptions(
         self,
-        payload: authentication.UserTokenPayload,
-    ) -> None:
-        if payload.user_id != self.bot_id:
-            LOGGER.warning(
-                "Ignoring OAuth authorization for unexpected Twitch user: id=%s",
-                payload.user_id,
+        broadcaster_id: str,
+    ) -> str | None:
+        conduit = self.conduit_info.conduit
+        if conduit is None:
+            raise RuntimeError("No Twitch conduit is available")
+
+        result = await self.fetch_eventsub_subscriptions(
+            conduit_id=conduit.id,
+        )
+        matching_subscription_id: str | None = None
+        stale_subscription_ids: list[str] = []
+
+        async for subscription in result.subscriptions:
+            if (
+                subscription.status != "enabled"
+                or subscription.type != "channel.chat.message"
+                or subscription.condition.get("user_id") != self.bot_id
+            ):
+                continue
+
+            if (
+                subscription.condition.get("broadcaster_user_id") == broadcaster_id
+                and matching_subscription_id is None
+            ):
+                matching_subscription_id = subscription.id
+            else:
+                stale_subscription_ids.append(subscription.id)
+
+        for subscription_id in stale_subscription_ids:
+            await self.delete_eventsub_subscription(subscription_id)
+
+        if stale_subscription_ids:
+            LOGGER.info(
+                "Removed stale Twitch chat subscriptions: count=%d",
+                len(stale_subscription_ids),
             )
-            return
 
-        LOGGER.info(
-            "Twitch user authorized: login=%s id=%s",
-            payload.user_login,
-            payload.user_id,
-        )
-
-        _ = await self.add_token(
-            payload.access_token,
-            payload.refresh_token,
-        )
+        return matching_subscription_id
 
     @override
     async def setup_hook(self) -> None:
@@ -175,23 +212,16 @@ class GiveawayTwitchBot(commands.AutoBot):
             LOGGER.warning("Unable to restore Twitch chat: no conduit available")
             return
 
-        existing_subscriptions = await self.fetch_eventsub_subscriptions(
-            conduit_id=conduit.id,
+        existing_subscription_id = await self._reconcile_chat_subscriptions(
+            broadcaster_id
         )
-
-        async for subscription in existing_subscriptions.subscriptions:
-            if (
-                subscription.status == "enabled"
-                and subscription.type == "channel.chat.message"
-                and subscription.condition.get("broadcaster_user_id") == broadcaster_id
-                and subscription.condition.get("user_id") == self.bot_id
-            ):
-                self._chat_subscription_id = subscription.id
-                LOGGER.info(
-                    "Restored Twitch chat subscription: broadcaster_id=%s",
-                    broadcaster_id,
-                )
-                return
+        if existing_subscription_id is not None:
+            self._chat_subscription_id = existing_subscription_id
+            LOGGER.info(
+                "Restored Twitch chat subscription: broadcaster_id=%s",
+                broadcaster_id,
+            )
+            return
 
         chat_subscription = eventsub.ChatMessageSubscription(
             broadcaster_user_id=broadcaster_id,

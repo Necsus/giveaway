@@ -19,6 +19,7 @@ from app.infrastructure.history import restore_active_giveaway
 from app.infrastructure.streamers import load_active_streamer
 from app.infrastructure.twitch import GiveawayTwitchBot
 from app.infrastructure.twitch_oauth import TwitchOAuthClient
+from app.web.access_logging import install_oauth_access_log_filter
 from app.web.routes.admin import router as admin_router
 from app.web.routes.auth import router as auth_router
 from app.web.routes.health import router as health_router
@@ -26,6 +27,8 @@ from app.web.routes.overlay import create_overlay_router
 from app.web.websocket import OverlayConnectionManager
 
 STATIC_DIRECTORY = Path(__file__).parent / "web" / "static"
+
+install_oauth_access_log_filter()
 
 giveaway_engine = GiveawayEngine()
 overlay_connections = OverlayConnectionManager()
@@ -67,11 +70,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     app.state.settings = settings
     app.state.database_connection = connection
     app.state.configuration = configuration
-    app.state.configuration_store = configuration_store
     app.state.session_signer = session_signer
     app.state.oauth_state_store = OAuthStateStore()
     app.state.twitch_oauth_client = twitch_oauth_client
-    app.state.giveaway_service = giveaway_service
 
     giveaway_command_handler = GiveawayCommandHandler(
         service=giveaway_service,
@@ -88,7 +89,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     twitch_bot: GiveawayTwitchBot | None = None
     twitch_task: asyncio.Task[None] | None = None
 
-    if configuration.twitch.enabled or settings.twitch_oauth_enabled:
+    if configuration.twitch.enabled:
         twitch_bot = GiveawayTwitchBot(
             settings=settings,
             configuration=configuration,
@@ -98,9 +99,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
             ),
         )
         twitch_task = asyncio.create_task(
-            twitch_bot.start(
-                with_adapter=settings.twitch_oauth_enabled,
-            ),
+            twitch_bot.start(with_adapter=False),
             name="twitch-bot",
         )
 

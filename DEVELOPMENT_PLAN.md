@@ -95,34 +95,34 @@ Le nettoyage suit toujours l'ordre **remplacer, valider, puis supprimer** afin d
 
 #### Nettoyage lié à A — identité persistante
 
-- [x] **DEV** : après la bascule dynamique de C, retirer `TWITCH_BROADCASTER_ID` et `TWITCH_CHANNEL_LOGIN` de `Settings`, de `.env.example` et du bootstrap JSON.
-- [x] **DEV** : retirer `broadcaster_id` et `channel_login` de la configuration globale lorsque SQLite est devenue l'unique source de l'identité streamer.
+- [x] **DEV** : retirer les anciennes variables d'environnement du streamer de `Settings`, de `.env.example` et du bootstrap JSON.
+- [x] **DEV** : retirer les anciens champs streamer de la configuration globale lorsque SQLite est devenue l'unique source de son identité.
 
 #### Nettoyage lié à B — authentification web
 
-- [ ] **DEV — EN COURS** : fournir et valider un mécanisme de bootstrap unique pour l'autorisation initiale du bot global.
-- [ ] Après ce remplacement, supprimer l'adaptateur OAuth local TwitchIO, `TWITCH_OAUTH_ENABLED`, l'option `with_adapter` et le callback `localhost:4343`.
-- [ ] Supprimer du README et de la spécification le tunnel SSH sur le port `4343` et les anciennes instructions d'autorisation.
-- [ ] Vérifier que `/auth/twitch/callback` est le seul callback OAuth utilisé pour les streamers.
+- [x] **DEV** : fournir et valider `/auth/twitch/bot/login` comme mécanisme unique d'autorisation initiale du bot global.
+- [x] **DEV** : supprimer le pilotage de l'adaptateur OAuth local TwitchIO et démarrer TwitchIO sans cet adaptateur.
+- [x] **DEV** : supprimer du README et de la spécification le tunnel SSH et les anciennes instructions d'autorisation locale.
+- [x] **DEV** : utiliser `/auth/twitch/callback` comme callback HTTPS unique, avec des états distincts pour les flux bot et streamer.
 
 #### Nettoyage lié à C — canal dynamique
 
-- [ ] Supprimer toute construction d'abonnement EventSub à partir d'un broadcaster configuré au démarrage.
-- [ ] Supprimer les branches de compatibilité qui autorisent encore les commandes avec l'ancien broadcaster statique.
-- [ ] Vérifier qu'aucun ancien abonnement EventSub ne reste actif après un changement de streamer.
+- [x] **DEV** : construire les abonnements EventSub uniquement à partir du streamer actif chargé depuis SQLite.
+- [x] **DEV** : supprimer les branches de compatibilité avec l'ancien broadcaster statique.
+- [x] **DEV** : supprimer les anciennes souscriptions de chat lors d'un changement de streamer et restaurer uniquement la souscription active.
 
 #### Nettoyage lié à D — administration
 
-- [ ] Supprimer les réponses, routes ou éléments frontend temporaires remplacés pendant la construction de `/admin`.
-- [ ] Vérifier qu'aucun ancien réglage streamer n'est encore affiché ou accepté par l'administration.
-- [ ] Rechercher les références mortes dans le code et la documentation avant de valider la page.
+- [x] **DEV** : supprimer les réponses, routes et éléments frontend temporaires remplacés pendant la construction de `/admin`.
+- [x] **DEV** : vérifier qu'aucun ancien réglage streamer n'est affiché ou accepté par l'administration.
+- [x] **DEV** : supprimer les références mortes du code et actualiser la documentation.
 
 #### Validation du nettoyage
 
-- Une recherche globale ne trouve plus `TWITCH_OAUTH_ENABLED`, `localhost:4343`, `TWITCH_BROADCASTER_ID` ni `TWITCH_CHANNEL_LOGIN`.
+- Une recherche globale ne trouve plus les anciens noms de variables d'environnement ni l'ancien callback local.
 - Le démarrage normal ne dépend plus d'un broadcaster statique dans `.env` ou `settings.json`.
-- Le bot global peut toujours être autorisé et restauré après suppression de l'ancien adaptateur.
-- Il n'existe qu'un seul parcours OAuth streamer et une seule source de vérité pour son identité.
+- Le bot global peut être autorisé puis restauré après suppression de l'ancien adaptateur.
+- Il existe un seul callback HTTPS et une seule source de vérité SQLite pour l'identité streamer.
 
 ## 1. Socle mono-streamer terminé
 
