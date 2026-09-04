@@ -268,11 +268,12 @@ Le nettoyage suit toujours l'ordre **remplacer, valider, puis supprimer** afin d
 
 ## 8. Déploiement et tests
 
-- [ ] Déployer avec systemd dans la configuration NixOS.
-- [ ] Publier uniquement dans le tailnet avec Tailscale Serve.
+- [ ] Déployer l'application avec systemd dans la configuration NixOS.
+- [x] Publier le service en HTTPS sur le LAN avec Nginx lié à `192.168.1.112:443` et un certificat ACME DNS-01 Cloudflare, sans exposition Internet.
+- [x] Conserver Tailscale Serve sur son adresse propre sans conflit avec l'écoute LAN.
 - [ ] Ajouter les tests unitaires et d'intégration.
 - [ ] Tester deux streamers et plusieurs sources OBS simultanément.
-- [ ] Documenter l'installation, OAuth, l'URL d'overlay et la récupération après incident.
+- [ ] Documenter l'installation complète, OAuth et la récupération après incident.
 
 ## MVP multi-streamer terminé
 

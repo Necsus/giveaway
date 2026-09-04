@@ -108,14 +108,20 @@ Sous PowerShell, utilise `\.venv\Scripts\Activate.ps1` et `Copy-Item .env.exampl
 | `http://127.0.0.1:8000/overlay` | Source navigateur OBS |
 | `http://127.0.0.1:8000/docs` | Documentation OpenAPI |
 
-Avec Tailscale Serve, le service est disponible en HTTPS privé, par exemple sur `https://forge.<tailnet>.ts.net/overlay`.
+Sur le réseau local, Nginx publie le service sur `https://giveaway.necsus.dev` et relaie HTTP ainsi que WebSocket vers Uvicorn. Le DNS public résout ce nom vers l'adresse privée `192.168.1.112` ; aucun port n'est redirigé depuis Internet. Le certificat Let's Encrypt est obtenu par challenge DNS-01 Cloudflare et renouvelé par ACME sous NixOS. Tailscale Serve reste utilisable séparément sur son adresse privée.
+
+| URL HTTPS locale | Usage |
+|---|---|
+| `https://giveaway.necsus.dev/health` | État du service |
+| `https://giveaway.necsus.dev/admin` | Administration Twitch |
+| `https://giveaway.necsus.dev/overlay` | Source navigateur OBS |
 
 ## Autorisation Twitch
 
-L’application créée dans la console Twitch doit déclarer le callback HTTPS de l’administration, par exemple :
+L’application créée dans la console Twitch doit déclarer exactement ce callback HTTPS :
 
 ```text
-https://forge.<tailnet>.ts.net/auth/twitch/callback
+https://giveaway.necsus.dev/auth/twitch/callback
 ```
 
 Le bot global et le streamer utilisent ce callback unique, avec des états OAuth distincts, courts et à usage unique.
@@ -123,7 +129,7 @@ Le bot global et le streamer utilisent ce callback unique, avec des états OAuth
 Pour autoriser ou réautoriser le bot configuré :
 
 1. démarrer le service avec Twitch activé ;
-2. ouvrir `https://forge.<tailnet>.ts.net/auth/twitch/bot/login` ;
+2. ouvrir `https://giveaway.necsus.dev/auth/twitch/bot/login` ;
 3. se connecter avec le compte bot configuré ;
 4. accepter `user:read:chat`, `user:write:chat` et `user:bot`.
 

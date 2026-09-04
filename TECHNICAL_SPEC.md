@@ -2,7 +2,7 @@
 
 ## 1. Objectif
 
-Construire un service central de giveaway Twitch multi-streamer hébergé sur la DevBox. Plusieurs streamers peuvent s'authentifier avec Twitch et utiliser simultanément leur propre giveaway. Tous les PC autorisés par Tailscale pourront accéder :
+Construire un service central de giveaway Twitch multi-streamer hébergé sur la DevBox. Plusieurs streamers peuvent s'authentifier avec Twitch et utiliser simultanément leur propre giveaway. Les PC du réseau local ou autorisés par Tailscale pourront accéder :
 
 - à un overlay OBS propre à chaque streamer ;
 - à une page d'administration authentifiée avec Twitch ;
@@ -68,7 +68,7 @@ Application Twitch + bot dédié global
 │ /admin ─ authentification Twitch ─ session signée   │
 └──────────────────────────────────────────────────────┘
                   │
-           réseau Tailscale
+       réseau local / Tailscale
                   ▼
           OBS et navigateurs
 ```
@@ -84,35 +84,34 @@ Application Twitch + bot dédié global
 - **Configuration globale** : fichier JSON local pour le bot dédié et les valeurs par défaut.
 - **Configuration par streamer** : SQLite, indexée par identifiant Twitch stable.
 - **Historique** : SQLite, toujours filtré par streamer.
-- **Accès réseau** : Tailscale uniquement.
-- **Déploiement** : service systemd déclaré dans la configuration NixOS.
+- **Accès réseau** : HTTPS privé sur le LAN et accès Tailscale séparé, sans redirection de port Internet.
+- **Déploiement** : services et pare-feu déclarés dans la configuration NixOS.
 
 ## 3. Accès depuis les PC
 
-Le service écoute localement sur la DevBox, par exemple :
+Le service applicatif écoute localement sur la DevBox :
 
 ```text
 http://127.0.0.1:8000
 ```
 
-Tailscale Serve publie ensuite ce service uniquement dans le tailnet avec une URL HTTPS, par exemple :
+Nginx est lié uniquement à l'adresse LAN de la DevBox et relaie HTTP ainsi que WebSocket :
 
 ```text
-https://devbox.<tailnet>.ts.net/overlay/<login_twitch>
-https://devbox.<tailnet>.ts.net/admin
+https://giveaway.necsus.dev → 192.168.1.112:443 → 127.0.0.1:8000
 ```
 
-La fonctionnalité Tailscale Funnel ne doit pas être activée : elle rendrait le service accessible publiquement sur Internet.
+Le DNS public du sous-domaine retourne l'adresse privée `192.168.1.112`. Le certificat Let's Encrypt est obtenu et renouvelé par NixOS avec un challenge DNS-01 Cloudflare ; l'application n'est donc pas publiée sur Internet et aucun certificat local ne doit être installé sur les clients. Tailscale Serve continue d'écouter uniquement sur son adresse Tailscale et ne rentre pas en conflit avec Nginx. La fonctionnalité Tailscale Funnel ne doit pas être activée.
 
 ### Source navigateur OBS
 
-Chaque streamer utilise une URL dérivée de son login Twitch :
+Dans le mode mono-streamer actuel, OBS utilise :
 
 ```text
-https://devbox.<tailnet>.ts.net/overlay/<login_twitch>
+https://giveaway.necsus.dev/overlay
 ```
 
-Toutes les sources OBS utilisant cette URL partagent l'état de ce streamer, sans recevoir celui des autres. Un changement de login Twitch change l'URL de l'overlay. Chaque installation OBS peut appliquer son propre **CSS personnalisé**.
+La cible multi-streamer utilisera `/overlay/<login_twitch>`. Toutes les sources OBS utilisant l'URL d'un streamer partageront son état sans recevoir celui des autres. Chaque installation OBS peut appliquer son propre **CSS personnalisé**.
 
 ## 4. Structure logique du service
 
@@ -278,7 +277,7 @@ La page `/admin` présente un bouton **Se connecter avec Twitch**. Le parcours O
 
 Le compte bot dédié est autorisé une seule fois avec `user:read:chat`, `user:write:chat` et `user:bot`. Chaque streamer autorise ensuite ce bot sur sa propre chaîne. Les tokens restent gérés par TwitchIO et ne sont jamais copiés dans SQLite ni envoyés au navigateur.
 
-L'accès réseau Tailscale constitue la première barrière. Tout membre du tailnet peut tenter une authentification Twitch et créer son espace. Une session valide reste obligatoire pour toutes les routes administratives.
+L'accès au LAN ou au tailnet constitue la première barrière. Toute personne ayant cet accès réseau peut tenter une authentification Twitch et créer son espace. Une session valide reste obligatoire pour toutes les routes administratives.
 
 ### Pages et endpoints cibles
 
@@ -532,7 +531,7 @@ Le déploiement doit être déclaratif :
 - unité systemd avec redémarrage automatique et `LimitNOFILE=65536` ;
 - un seul worker Uvicorn tant que l'état reste en mémoire ;
 - service applicatif lié à `127.0.0.1` ;
-- publication HTTPS privée avec Tailscale Serve ;
+- publication HTTPS privée sur le LAN avec Nginx lié à `192.168.1.112:443`, certificat ACME DNS-01 Cloudflare et accès Tailscale séparé ;
 - journaux applicatifs accessibles avec `journalctl` et access logs réduits ;
 - sauvegarde périodique du JSON et de SQLite.
 
