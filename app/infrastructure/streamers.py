@@ -77,3 +77,30 @@ def load_active_streamer(
         display_name=cast(str, row["display_name"]),
         profile_image_url=cast(str, row["profile_image_url"]),
     )
+
+
+def load_streamer(
+    connection: sqlite3.Connection,
+    twitch_user_id: str,
+) -> Streamer | None:
+    cursor = connection.execute(
+        """
+        SELECT twitch_user_id, login, display_name, profile_image_url
+        FROM streamers
+        WHERE twitch_user_id = ?
+        LIMIT 1;
+        """,
+        (twitch_user_id,),
+    )
+    row = cast(sqlite3.Row | None, cursor.fetchone())
+    cursor.close()
+
+    if row is None:
+        return None
+
+    return Streamer(
+        twitch_user_id=cast(str, row["twitch_user_id"]),
+        login=cast(str, row["login"]),
+        display_name=cast(str, row["display_name"]),
+        profile_image_url=cast(str, row["profile_image_url"]),
+    )
