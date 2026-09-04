@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import sqlite3
 from typing import cast
@@ -8,6 +9,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from twitchio.exceptions import HTTPException as TwitchHTTPException
 from twitchio.exceptions import TwitchioException
 
+from app.application.commands import GiveawayCommandHandler
 from app.application.oauth_state import OAuthStateStore
 from app.application.session import SESSION_COOKIE_NAME, SessionSigner
 from app.core.environment import Settings
@@ -109,6 +111,14 @@ async def twitch_callback(
             detail="Unable to persist the Twitch identity",
         ) from None
 
+    giveaway_command_handler = cast(
+        GiveawayCommandHandler,
+        request.app.state.giveaway_command_handler,
+    )
+    giveaway_command_handler.set_active_broadcaster(
+        authorization.twitch_user_id,
+    )
+
     twitch_bot = cast(
         GiveawayTwitchBot | None,
         request.app.state.twitch_bot,
@@ -117,8 +127,16 @@ async def twitch_callback(
 
     if twitch_bot is not None:
         try:
+            async with asyncio.timeout(10):
+                await twitch_bot.wait_until_ready()
+
             await twitch_bot.subscribe_to_streamer(authorization)
-        except (TwitchioException, aiohttp.ClientError, ValueError) as subscribe_error:
+        except (
+            TimeoutError,
+            TwitchioException,
+            aiohttp.ClientError,
+            ValueError,
+        ) as subscribe_error:
             LOGGER.warning(
                 "Unable to subscribe to Twitch chat: streamer_id=%s error=%s",
                 authorization.twitch_user_id,

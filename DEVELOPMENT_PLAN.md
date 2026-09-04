@@ -61,9 +61,9 @@ Cette étape rend une même installation utilisable successivement par différen
 - [x] **DEV** : construire `ChatMessageSubscription` avec `broadcaster_user_id` égal au streamer et `user_id` égal au bot.
 - [x] **DEV** : appeler l'abonnement dynamique après le callback OAuth sans exposer les tokens.
 - [x] **DEV** : supprimer ou désactiver l'ancien abonnement lors d'un changement de streamer et ignorer tout événement d'un autre canal.
-- [ ] **DEV — EN COURS** : rendre l'autorisation des commandes de gestion dépendante de l'identifiant du streamer actif.
-- [ ] **DEV** : restaurer l'abonnement du streamer actif au redémarrage.
-- [ ] **IA** : expliquer la distinction application, bot, broadcaster, token et abonnement EventSub.
+- [x] **DEV** : rendre l'autorisation des commandes de gestion dépendante de l'identifiant du streamer actif.
+- [x] **DEV** : restaurer l'abonnement du streamer actif au redémarrage.
+- [x] **IA** : expliquer la distinction application, bot, broadcaster, token et abonnement EventSub.
 
 #### Validation C
 
@@ -76,7 +76,7 @@ Avec `fluffy` comme streamer actif et `necsus_dev` comme bot :
 
 ### D. Première page d'administration
 
-- [ ] **DEV** : créer `/admin` et afficher un bouton **Se connecter avec Twitch** sans session.
+- [ ] **DEV — EN COURS** : créer `/admin` et afficher un bouton **Se connecter avec Twitch** sans session.
 - [ ] **DEV** : afficher après connexion l'avatar, le nom, le login, le streamer actif et le bot global.
 - [ ] **DEV** : afficher séparément l'état de la session et l'état de l'abonnement au chat.
 - [ ] **DEV** : afficher l'URL OBS actuelle avec une action de copie.

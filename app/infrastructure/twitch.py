@@ -25,8 +25,19 @@ class GiveawayTwitchBot(commands.AutoBot):
         settings: Settings,
         configuration: ApplicationConfiguration,
         command_handler: GiveawayCommandHandler,
+        active_broadcaster_id: str | None,
     ) -> None:
         twitch_configuration = configuration.twitch
+
+        subscriptions: list[eventsub.SubscriptionPayload] = []
+
+        if active_broadcaster_id is not None:
+            subscriptions.append(
+                eventsub.ChatMessageSubscription(
+                    broadcaster_user_id=active_broadcaster_id,
+                    user_id=twitch_configuration.bot_id,
+                )
+            )
 
         super().__init__(
             client_id=settings.twitch_client_id,
@@ -35,11 +46,12 @@ class GiveawayTwitchBot(commands.AutoBot):
             owner_id=twitch_configuration.owner_id,
             prefix=configuration.commands.prefix,
             scopes=BOT_SCOPES,
+            subscriptions=subscriptions,
         )
 
         self._command_handler: GiveawayCommandHandler = command_handler
         self._subscription_lock: asyncio.Lock = asyncio.Lock()
-        self._active_broadcaster_id: str | None = None
+        self._active_broadcaster_id: str | None = active_broadcaster_id
         self._chat_subscription_id: str | None = None
 
     async def subscribe_to_streamer(
@@ -141,4 +153,68 @@ class GiveawayTwitchBot(commands.AutoBot):
         _ = await self.add_token(
             payload.access_token,
             payload.refresh_token,
+        )
+
+    @override
+    async def setup_hook(self) -> None:
+        await super().setup_hook()
+
+        broadcaster_id = self._active_broadcaster_id
+        if broadcaster_id is None:
+            return
+
+        conduit = self.conduit_info.conduit
+        if conduit is None:
+            LOGGER.warning("Unable to restore Twitch chat: no conduit available")
+            return
+
+        existing_subscriptions = await self.fetch_eventsub_subscriptions(
+            conduit_id=conduit.id,
+        )
+
+        async for subscription in existing_subscriptions.subscriptions:
+            if (
+                subscription.status == "enabled"
+                and subscription.type == "channel.chat.message"
+                and subscription.condition.get("broadcaster_user_id") == broadcaster_id
+                and subscription.condition.get("user_id") == self.bot_id
+            ):
+                self._chat_subscription_id = subscription.id
+                LOGGER.info(
+                    "Restored Twitch chat subscription: broadcaster_id=%s",
+                    broadcaster_id,
+                )
+                return
+
+        chat_subscription = eventsub.ChatMessageSubscription(
+            broadcaster_user_id=broadcaster_id,
+            user_id=self.bot_id,
+        )
+
+        result = await self.multi_subscribe(
+            [chat_subscription],
+            wait=True,
+            stop_on_error=False,
+        )
+
+        if len(result.success) != 1:
+            LOGGER.warning(
+                "Unable to recreate Twitch chat subscription: broadcaster_id=%s error=%d",
+                broadcaster_id,
+                len(result.errors),
+            )
+            return
+
+        response_data = result.success[0].response["data"]
+        if len(response_data) != 1 or not response_data[0]["id"]:
+            LOGGER.warning(
+                "Twitch returned an invalid chat subscription response: broadcaster_id=%s",
+                broadcaster_id,
+            )
+            return
+
+        self._chat_subscription_id = response_data[0]["id"]
+
+        LOGGER.info(
+            "Recreated Twitch chat subscription: broadcaster_id=%s", broadcaster_id
         )

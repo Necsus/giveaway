@@ -21,18 +21,21 @@ class GiveawayCommandHandler:
     def __init__(
         self,
         service: GiveawayService,
-        broadcaster_id: str,
         prefix: str = "!",
     ) -> None:
-        if not broadcaster_id.strip():
-            raise ValueError("The broadcaster ID cannot be empty")
-
         if not prefix:
             raise ValueError("The command prefix cannot be empty")
 
         self._service: GiveawayService = service
-        self._broadcaster_id: str = broadcaster_id
+        self._active_broadcaster_id: str | None = None
         self._prefix: str = prefix
+
+    def set_active_broadcaster(self, twitch_user_id: str) -> None:
+        normalized_user_id = twitch_user_id.strip()
+        if not normalized_user_id:
+            raise ValueError("The broadcaster ID cannot be empty")
+
+        self._active_broadcaster_id = normalized_user_id
 
     async def handle(
         self,
@@ -48,7 +51,7 @@ class GiveawayCommandHandler:
 
         if (
             command in management_commands
-            and author.twitch_user_id != self._broadcaster_id
+            and author.twitch_user_id != self._active_broadcaster_id
         ):
             return CommandResult(False, "This command is reserved for the broadcaster")
 

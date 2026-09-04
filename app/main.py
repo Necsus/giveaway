@@ -16,6 +16,7 @@ from app.domain.giveaway import GiveawayEngine
 from app.infrastructure.configuration_store import ConfigurationStore
 from app.infrastructure.database import connect_database, initialize_database
 from app.infrastructure.history import restore_active_giveaway
+from app.infrastructure.streamers import load_active_streamer
 from app.infrastructure.twitch import GiveawayTwitchBot
 from app.infrastructure.twitch_oauth import TwitchOAuthClient
 from app.web.routes.admin import router as admin_router
@@ -53,6 +54,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
 
     connection = connect_database()
     initialize_database(connection)
+
+    active_streamer = load_active_streamer(connection)
     _ = restore_active_giveaway(connection, giveaway_engine)
 
     giveaway_service = GiveawayService(
@@ -73,9 +76,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
 
     giveaway_command_handler = GiveawayCommandHandler(
         service=giveaway_service,
-        broadcaster_id=configuration.twitch.broadcaster_id,
         prefix=configuration.commands.prefix,
     )
+
+    if active_streamer is not None:
+        giveaway_command_handler.set_active_broadcaster(
+            active_streamer.twitch_user_id,
+        )
 
     app.state.giveaway_command_handler = giveaway_command_handler
 
@@ -87,6 +94,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
             settings=settings,
             configuration=configuration,
             command_handler=giveaway_command_handler,
+            active_broadcaster_id=(
+                active_streamer.twitch_user_id if active_streamer is not None else None
+            ),
         )
         twitch_task = asyncio.create_task(
             twitch_bot.start(
