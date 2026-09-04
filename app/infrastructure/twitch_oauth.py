@@ -112,7 +112,6 @@ class TwitchOAuthClient:
 
         if not isinstance(profile_image_url, str):
             raise TypeError("The Twitch profile has no valid profile image URL")
-
         return login, display_name, profile_image_url
 
     async def close(self) -> None:
