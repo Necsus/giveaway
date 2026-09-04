@@ -142,14 +142,13 @@ Le nettoyage suit toujours l'ordre **remplacer, valider, puis supprimer** afin d
 
 ### Évolution planifiée — plusieurs gagnants pour un même lot
 
-- [ ] Remplacer le gagnant unique par une collection ordonnée de gagnants.
-- [ ] Faire du premier `!gapull` la fermeture définitive des inscriptions pour le lot courant et le tirage du premier gagnant.
-- [ ] Autoriser de nouveaux `!gapull` dans l'état `WINNER` jusqu'à `!gastop`.
-- [ ] Exclure des tirages suivants tous les utilisateurs ayant déjà gagné ce lot.
-- [ ] Refuser proprement un nouveau tirage lorsque tous les participants ont déjà gagné.
-- [ ] Persister l'ordre de tous les gagnants et le restaurer après redémarrage.
-- [ ] Afficher la liste des gagnants dans l'overlay et les événements WebSocket.
-- [ ] Adapter les tests du moteur, des commandes et de SQLite aux tirages multiples.
+- [x] Remplacer le gagnant unique par une collection ordonnée de gagnants.
+- [x] Faire du premier `!gapull` la fermeture définitive des inscriptions pour le lot courant et le tirage du premier gagnant.
+- [x] Autoriser de nouveaux `!gapull` dans l'état `WINNER` jusqu'à `!gastop`.
+- [x] Exclure des tirages suivants tous les utilisateurs ayant déjà gagné ce lot.
+- [x] Refuser proprement un nouveau tirage lorsque tous les participants ont déjà gagné.
+- [x] Persister l'ordre de tous les gagnants et le restaurer après redémarrage.
+- [x] Afficher la liste des gagnants dans l'overlay et les événements WebSocket.
 
 #### Validation des tirages multiples
 

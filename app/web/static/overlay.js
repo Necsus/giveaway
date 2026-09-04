@@ -9,7 +9,11 @@ function renderGiveaway(state) {
   lotElement.textContent = state.lot ?? "";
   statusElement.textContent = state.state;
   participantsElement.textContent = String(state.participant_count);
-  winnerElement.textContent = state.winner?.display_name ?? "";
+
+  const winners = state.winners ?? [];
+  winnerElement.textContent = winners
+    .map((winner, index) => `${index + 1}. ${winner.display_name}`)
+    .join(" • ");
 }
 
 function connectWebSocket() {

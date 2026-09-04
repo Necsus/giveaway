@@ -169,7 +169,7 @@ HIDDEN --!galot--> WAITING --!gastart--> OPEN --!gapull--> WINNER
 | `HIDDEN` | Masqué | Refusées | Aucun giveaway visible. |
 | `WAITING` | Visible | Refusées | Le lot est annoncé, mais les inscriptions ne sont pas ouvertes. |
 | `OPEN` | Visible | Acceptées | Les viewers peuvent utiliser `!join`. |
-| `WINNER` | Visible | Refusées | Le gagnant est affiché. |
+| `WINNER` | Visible | Refusées | La liste ordonnée des gagnants est affichée. |
 
 L'état actif contient au minimum :
 
@@ -178,14 +178,9 @@ L'état actif contient au minimum :
   "state": "OPEN",
   "giveaway_id": "uuid",
   "lot": "Clavier mécanique",
-  "participants": [
-    {
-      "twitch_user_id": "123456",
-      "login": "viewer",
-      "display_name": "Viewer"
-    }
-  ],
-  "winner": null
+  "participant_count": 1,
+  "participants": ["Viewer"],
+  "winners": []
 }
 ```
 
@@ -196,7 +191,7 @@ L'état actif contient au minimum :
 | `!galot <nom>` | `HIDDEN` | Crée le giveaway et passe à `WAITING`. |
 | `!gastart` | `WAITING` | Passe à `OPEN`. |
 | `!join` | `OPEN` | Ajoute le viewer s'il n'est pas déjà inscrit. |
-| `!gapull` | `OPEN` | Ferme les inscriptions, choisit un gagnant et passe à `WINNER`. |
+| `!gapull` | `OPEN` ou `WINNER` | Ferme les inscriptions au premier tirage, puis ajoute un gagnant inédit et reste dans `WINNER`. |
 | `!gastop` | `WAITING`, `OPEN` ou `WINNER` | Archive l'état courant puis repasse à `HIDDEN`. |
 
 Règles complémentaires :
@@ -204,8 +199,8 @@ Règles complémentaires :
 - `!galot`, `!gastart`, `!gapull` et `!gastop` sont réservées au broadcaster du canal où la commande est reçue ;
 - l'autorisation est vérifiée avec l'identifiant Twitch, pas avec le nom affiché ;
 - `!galot` est refusé si un giveaway est déjà visible ;
-- `!gapull` est refusé lorsqu'aucun participant n'est inscrit ;
-- le gagnant est choisi une seule fois côté serveur avec `secrets.choice` ;
+- `!gapull` est refusé lorsqu'aucun participant n'est inscrit ou lorsque tous ont déjà gagné ;
+- chaque gagnant est choisi côté serveur avec `secrets.choice` parmi les participants qui n'ont pas encore gagné ;
 - un verrou asynchrone protège `!join`, `!gapull` et `!gastop` contre les traitements concurrents ;
 - chaque transition valide déclenche une sauvegarde SQLite et une diffusion WebSocket.
 
@@ -253,10 +248,16 @@ Exemple :
     "lot": "Clavier mécanique",
     "participant_count": 24,
     "participants": ["Viewer1", "Viewer2"],
-    "winner": {
-      "twitch_user_id": "123456",
-      "display_name": "Viewer1"
-    }
+    "winners": [
+      {
+        "twitch_user_id": "123456",
+        "display_name": "Viewer1"
+      },
+      {
+        "twitch_user_id": "789012",
+        "display_name": "Viewer2"
+      }
+    ]
   }
 }
 ```
@@ -404,10 +405,8 @@ Les access tokens et refresh tokens ne sont pas stockés dans cette table. Penda
 | `status` | TEXT | `WAITING`, `OPEN`, `WINNER`, `COMPLETED` ou `CANCELLED`. |
 | `created_at` | TEXT | Date UTC de `!galot`. |
 | `opened_at` | TEXT, nullable | Date UTC de `!gastart`. |
-| `drawn_at` | TEXT, nullable | Date UTC de `!gapull`. |
+| `drawn_at` | TEXT, nullable | Date UTC du premier `!gapull`. |
 | `stopped_at` | TEXT, nullable | Date UTC de `!gastop`. |
-| `winner_user_id` | TEXT, nullable | Identifiant Twitch du gagnant. |
-| `winner_display_name` | TEXT, nullable | Nom affiché au moment du tirage. |
 
 ### Table `participants`
 
@@ -422,6 +421,18 @@ Les access tokens et refresh tokens ne sont pas stockés dans cette table. Penda
 
 Une contrainte unique sur `(giveaway_id, twitch_user_id)` empêche les doubles inscriptions au niveau de la base. L'index unique partiel actuel, global, devra être remplacé par un index sur `broadcaster_id` garantissant au plus un giveaway `WAITING`, `OPEN` ou `WINNER` par streamer. Plusieurs streamers pourront ainsi avoir un giveaway actif simultanément.
 
+### Table `winners`
+
+| Colonne | Type | Description |
+|---|---|---|
+| `giveaway_id` | TEXT, clé primaire composée | Référence au giveaway. |
+| `twitch_user_id` | TEXT, clé primaire composée | Identifiant Twitch stable du gagnant. |
+| `display_name` | TEXT | Nom affiché au moment du tirage. |
+| `drawn_at` | TEXT | Date UTC de ce tirage. |
+| `draw_order` | INTEGER | Position du gagnant dans l'ordre des tirages. |
+
+Les contraintes sur `(giveaway_id, twitch_user_id)` et `(giveaway_id, draw_order)` empêchent respectivement un participant de gagner deux fois et deux gagnants d'occuper la même position. La clé étrangère composée garantit que chaque gagnant était inscrit au giveaway.
+
 ### Utilisation
 
 - SQLite fonctionne en mode WAL ;
@@ -429,7 +440,7 @@ Une contrainte unique sur `(giveaway_id, twitch_user_id)` empêche les doubles i
 - les transitions et inscriptions utilisent des transactions ;
 - les dates sont enregistrées en UTC ;
 - au démarrage, le service recharge au plus un giveaway actif par streamer ;
-- `!gapull` enregistre le statut `WINNER` tant que le résultat reste affiché ;
+- le premier `!gapull` enregistre le statut `WINNER`, puis chaque tirage persiste un gagnant inédit avec son ordre ;
 - `!gastop` transforme `WINNER` en `COMPLETED`, ou `WAITING`/`OPEN` en `CANCELLED`, puis masque l'overlay sans supprimer l'historique ;
 - les migrations de schéma sont versionnées et exécutées au démarrage.
 
@@ -477,7 +488,7 @@ La diffusion séquentielle actuelle est bloquante : 100 clients prenant chacun 1
 - limiter les connexions par streamer et la taille des messages entrants ;
 - utiliser une reconnexion exponentielle avec jitter dans le navigateur.
 
-L'événement d'overlay ne doit contenir que l'état, le lot, le nombre de participants et le gagnant. La liste complète des participants est réservée à une API administrative paginée. À titre de comparaison, l'instantané actuel atteint environ 126 Kio avec 10 000 participants.
+L'événement d'overlay ne doit contenir que l'état, le lot, le nombre de participants et les gagnants. La liste complète des participants est réservée à une API administrative paginée. À titre de comparaison, l'instantané actuel atteint environ 126 Kio avec 10 000 participants.
 
 ### SQLite et cohérence
 
@@ -558,7 +569,7 @@ Les tests automatisés décrits ci-dessous restent l'objectif avant la fin du MV
 - refus des commandes dans le mauvais état ;
 - double `!join` ;
 - `!gapull` avec 0, 1 et plusieurs participants ;
-- unicité et conservation du gagnant ;
+- unicité, ordre et conservation des gagnants ;
 - chargement et validation de `.env` sans exposition des secrets ;
 - validation et écriture atomique du JSON global ;
 - résolution d'un runtime par identifiant Twitch ;

@@ -82,26 +82,54 @@ def draw_giveaway(
 ) -> None:
     drawn_at = datetime.now(UTC).isoformat()
 
-    cursor = connection.execute(
-        """
-        UPDATE giveaways
-        SET
-            status = 'WINNER',
-            drawn_at = ?,
-            winner_user_id = ?,
-            winner_display_name = ?
-        WHERE id = ? AND status = 'OPEN'
-        """,
-        (drawn_at, winner.twitch_user_id, winner.display_name, giveaway_id),
-    )
-    updated_rows = cursor.rowcount
-    cursor.close()
+    with connection:
+        cursor = connection.execute(
+            """
+            UPDATE giveaways
+            SET
+                status = 'WINNER',
+                drawn_at = COALESCE(drawn_at, ?)
+            WHERE id = ? AND status IN ('OPEN', 'WINNER')
+            """,
+            (drawn_at, giveaway_id),
+        )
+        updated_rows = cursor.rowcount
+        cursor.close()
 
-    if updated_rows != 1:
-        connection.rollback()
-        raise RuntimeError("The giveaway is not open")
+        if updated_rows != 1:
+            raise RuntimeError("The giveaway cannot be drawn")
 
-    connection.commit()
+        cursor = connection.execute(
+            """
+            INSERT INTO winners (
+                giveaway_id,
+                twitch_user_id,
+                display_name,
+                drawn_at,
+                draw_order
+            )
+            SELECT
+                ?,
+                ?,
+                ?,
+                ?,
+                COALESCE(MAX(draw_order), 0) + 1
+            FROM winners
+            WHERE giveaway_id = ?
+            """,
+            (
+                giveaway_id,
+                winner.twitch_user_id,
+                winner.display_name,
+                drawn_at,
+                giveaway_id,
+            ),
+        )
+        inserted_rows = cursor.rowcount
+        cursor.close()
+
+        if inserted_rows != 1:
+            raise RuntimeError("The winner was not persisted")
 
 
 def stop_giveaway(
@@ -140,7 +168,7 @@ def restore_active_giveaway(
 ) -> bool:
     cursor = connection.execute(
         """
-        SELECT id, lot, status, winner_user_id
+        SELECT id, lot, status
         FROM giveaways
         WHERE status IN ('WAITING', 'OPEN', 'WINNER')
         ORDER BY created_at DESC
@@ -176,12 +204,26 @@ def restore_active_giveaway(
         for row in participant_rows
     ]
 
+    cursor = connection.execute(
+        """
+        SELECT twitch_user_id
+        FROM winners
+        WHERE giveaway_id = ?
+        ORDER BY draw_order
+        """,
+        (giveaway_id,),
+    )
+    winner_rows = cast(list[sqlite3.Row], cursor.fetchall())
+    cursor.close()
+
+    winner_user_ids = [cast(str, row["twitch_user_id"]) for row in winner_rows]
+
     engine.restore(
         giveaway_id=giveaway_id,
         lot=cast(str, giveaway_row["lot"]),
         state=GiveawayState(cast(str, giveaway_row["status"])),
         participants=participants,
-        winner_user_id=cast(str | None, giveaway_row["winner_user_id"]),
+        winner_user_ids=winner_user_ids,
     )
 
     return True

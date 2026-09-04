@@ -22,7 +22,7 @@ Overlay de giveaway pour Twitch, affiché dans OBS comme source navigateur et pi
 | `!galot <lot>` | Streamer | Prépare le lot et affiche l’overlay. |
 | `!gastart` | Streamer | Ouvre les inscriptions. |
 | `!join` | Viewer | Inscrit le viewer une seule fois. |
-| `!gapull` | Streamer | Ferme les inscriptions et tire un gagnant. |
+| `!gapull` | Streamer | Ferme les inscriptions au premier tirage, puis ajoute un gagnant inédit. |
 | `!gastop` | Streamer | Termine le giveaway et masque l’overlay. |
 
 ```text
@@ -30,6 +30,8 @@ HIDDEN --!galot--> WAITING --!gastart--> OPEN --!gapull--> WINNER
    ^                   |                    |                  |
    └-------------------┴------ !gastop -----┴------------------┘
 ```
+
+Dans l'état `WINNER`, chaque nouveau `!gapull` ajoute un gagnant qui n'a pas encore gagné le lot, jusqu'à épuisement des participants ou `!gastop`.
 
 ## Architecture
 
