@@ -523,6 +523,36 @@ input:focus-visible {
   line-height: 1.55;
 }
 
+.overlay-access-summary {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem;
+  margin-bottom: 1.25rem;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.overlay-rotated-at {
+  min-height: 1rem;
+  margin: 0.5rem 0 0;
+  color: var(--text-subtle);
+  font-size: 0.75rem;
+}
+
+.overlay-url-field {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.field-label {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 650;
+}
+
 .copy-field {
   display: flex;
   gap: 0.65rem;
@@ -547,6 +577,40 @@ input:focus-visible {
 
 .copy-field .button {
   flex: 0 0 auto;
+}
+
+.copy-field .button:disabled {
+  cursor: not-allowed;
+}
+
+.security-note {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.7rem;
+  align-items: start;
+  padding: 0.85rem 1rem;
+  margin-top: 1rem;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  line-height: 1.5;
+  background: rgba(244, 183, 64, 0.06);
+  border: 1px solid rgba(244, 183, 64, 0.18);
+  border-radius: var(--radius-sm);
+}
+
+.security-note svg {
+  width: 1.05rem;
+  height: 1.05rem;
+  margin-top: 0.15rem;
+  color: var(--warning);
+}
+
+.security-note p {
+  margin: 0;
+}
+
+.security-note strong {
+  color: var(--text);
 }
 
 .feedback {
@@ -708,6 +772,15 @@ input:focus-visible {
     width: 58px;
     height: 58px;
     border-radius: 15px;
+  }
+
+  .overlay-access-summary {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .overlay-access-summary .button {
+    width: 100%;
   }
 
   .copy-field {

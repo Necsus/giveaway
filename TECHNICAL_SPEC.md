@@ -2,11 +2,11 @@
 
 ## 1. Objectif
 
-Construire un service central de giveaway Twitch multi-streamer hébergé sur la DevBox. Plusieurs streamers peuvent s'authentifier avec Twitch et utiliser simultanément leur propre giveaway. Les PC du réseau local ou autorisés par Tailscale pourront accéder :
+Construire sur la DevBox une plateforme centrale d'overlays Twitch extensible, dont le giveaway constitue le premier plugin. Plusieurs streamers pourront s'authentifier avec Twitch, activer différents plugins et utiliser simultanément leurs propres overlays. Les PC du réseau local ou autorisés par Tailscale pourront accéder :
 
-- à un overlay OBS propre à chaque streamer ;
-- à une page d'administration authentifiée avec Twitch ;
-- à un historique strictement limité au streamer connecté.
+- à des overlays OBS isolés par streamer et par plugin ;
+- à une page d'administration commune authentifiée avec Twitch ;
+- aux réglages et historiques strictement limités au streamer connecté.
 
 Le service reste la source de vérité. OBS affiche l'état reçu mais ne gère ni les commandes Twitch, ni les permissions, ni le tirage. Une application Twitch et un compte bot dédié sont partagés par l'instance ; le Client ID et le Client Secret identifient l'application, pas le compte bot.
 
@@ -25,7 +25,9 @@ Le socle local est actuellement opérationnel :
 - gestion de plusieurs connexions WebSocket ;
 - overlay HTML/JavaScript sans thème avec reconnexion automatique.
 
-Le fonctionnement actuel reste mono-streamer, avec un bot global fixe et un seul streamer dynamique connecté par `/admin`. Le `broadcaster_id` autorisé et le canal écouté proviennent de l'identité Twitch persistée dans SQLite après validation OAuth, jamais du navigateur ni de la configuration globale. L'isolation de plusieurs streamers simultanés viendra après cette étape. Les tests automatisés sont reportés ; les contrôles actuels sont manuels et complétés par Ruff et BasedPyright.
+Le fonctionnement applicatif actuel reste mono-streamer, avec un bot global fixe et un seul streamer dynamique connecté par `/admin`. Le `broadcaster_id` autorisé et le canal écouté proviennent de l'identité Twitch persistée dans SQLite après validation OAuth, jamais du navigateur ni de la configuration globale. Les routes canoniques `/plugins/giveaway/overlay` et `/plugins/giveaway/ws` sont utilisées par le frontend et protégées par une clé OBS. Le WebSocket attend le premier message d'authentification, valide le hash et le streamer actif, puis diffuse l'état ; les absences, délais et clés invalides ferment avec le code `1008`. Les anciennes routes `/overlay`, `/ws/overlay` et `/api/state` ont été supprimées après validation.
+
+L'infrastructure sert uniquement `overlay.necsus.dev` avec un certificat public ACME DNS-01 Cloudflare. Le domaine canonique, son WebSocket, le parcours OAuth Twitch et la rotation des clés OBS ont été validés. L'ancien domaine `giveaway.necsus.dev`, son virtual host, son certificat et son DNS ont été retirés sans redirection. Les assets administratifs et ceux du plugin ont désormais des répertoires et montages distincts ; la migration ne conserve plus aucun alias historique. Les tests automatisés sont reportés ; les contrôles actuels sont manuels et complétés par Ruff et BasedPyright.
 
 ### Étape intermédiaire retenue
 
@@ -62,8 +64,8 @@ Application Twitch + bot dédié global
 ┌──────────────────────────────────────────────────────┐
 │ Service Python / FastAPI sur la DevBox               │
 │                                                      │
-│ Streamer A ─ moteur A ─ historique A ─ /overlay/A   │
-│ Streamer B ─ moteur B ─ historique B ─ /overlay/B   │
+│ /plugins/giveaway ─ moteurs et historiques isolés   │
+│ /plugins/chat     ─ futur plugin indépendant        │
 │                                                      │
 │ /admin ─ authentification Twitch ─ session signée   │
 └──────────────────────────────────────────────────────┘
@@ -84,6 +86,9 @@ Application Twitch + bot dédié global
 - **Configuration globale** : fichier JSON local pour le bot dédié et les valeurs par défaut.
 - **Configuration par streamer** : SQLite, indexée par identifiant Twitch stable.
 - **Historique** : SQLite, toujours filtré par streamer.
+- **Domaine canonique** : `overlay.necsus.dev`, commun à la plateforme.
+- **Namespace des plugins** : `/plugins/<plugin>` ; le premier est `/plugins/giveaway`.
+- **Accès OBS** : clé de lecture distincte par streamer et par plugin, indépendante de la session OAuth.
 - **Accès réseau** : HTTPS privé sur le LAN et accès Tailscale séparé, sans redirection de port Internet.
 - **Déploiement** : services et pare-feu déclarés dans la configuration NixOS.
 
@@ -98,20 +103,22 @@ http://127.0.0.1:8000
 Nginx est lié uniquement à l'adresse LAN de la DevBox et relaie HTTP ainsi que WebSocket :
 
 ```text
-https://giveaway.necsus.dev → 192.168.1.112:443 → 127.0.0.1:8000
+https://overlay.necsus.dev → 192.168.1.112:443 → 127.0.0.1:8000
 ```
 
 Le DNS public du sous-domaine retourne l'adresse privée `192.168.1.112`. Le certificat Let's Encrypt est obtenu et renouvelé par NixOS avec un challenge DNS-01 Cloudflare ; l'application n'est donc pas publiée sur Internet et aucun certificat local ne doit être installé sur les clients. Tailscale Serve continue d'écouter uniquement sur son adresse Tailscale et ne rentre pas en conflit avec Nginx. La fonctionnalité Tailscale Funnel ne doit pas être activée.
 
+L'ancien domaine `giveaway.necsus.dev` n'est plus publié ni accepté par Nginx.
+
 ### Source navigateur OBS
 
-Dans le mode mono-streamer actuel, OBS utilise :
+Le mode mono-streamer utilise désormais exclusivement le namespace du premier plugin :
 
 ```text
-https://giveaway.necsus.dev/overlay
+https://overlay.necsus.dev/plugins/giveaway/overlay#<clé-OBS>
 ```
 
-La cible multi-streamer utilisera `/overlay/<login_twitch>`. Toutes les sources OBS utilisant l'URL d'un streamer partageront son état sans recevoir celui des autres. Chaque installation OBS peut appliquer son propre **CSS personnalisé**.
+La clé est propre au couple streamer/plugin. Toutes les sources OBS possédant cette clé partagent l'état concerné, sans obtenir de droit administratif ni accès aux autres plugins. Chaque installation OBS peut appliquer son propre **CSS personnalisé**.
 
 ## 4. Structure logique du service
 
@@ -138,10 +145,14 @@ app/
     │   ├── admin.py                # page et API d'administration protégée
     │   └── auth.py                 # OAuth Twitch et session web
     └── static/
-        ├── overlay.html            # squelette de l'overlay
-        ├── overlay.js              # réception et rendu de l'état
-        ├── admin.html              # interface d'administration
-        └── admin.js                # logique d'administration
+        ├── admin/
+        │   ├── admin.html          # interface d'administration
+        │   ├── admin.js            # logique d'administration
+        │   └── admin.css           # présentation de l'administration
+        └── plugins/
+            └── giveaway/
+                ├── overlay.html    # squelette de l'overlay
+                └── overlay.js      # authentification, réception et rendu
 
 .env.example                  # modèle versionné avec valeurs fictives
 requirements.txt              # dépendances Python épinglées
@@ -151,7 +162,7 @@ data/
 └── giveaway.sqlite3        # base non versionnée
 ```
 
-Cette arborescence est indicative. Les règles métier doivent rester indépendantes de FastAPI, Twitch et SQLite afin de pouvoir être testées simplement.
+Les fichiers statiques du premier plugin sont regroupés sous `static/plugins/giveaway` et servis uniquement par `/plugins/giveaway/static`. Les assets administratifs résident sous `static/admin` et leur montage `/static` ne peut plus exposer ceux des plugins. Les routes, API et WebSockets restent regroupés progressivement sous `/plugins/giveaway`, sans créer de framework de plugins générique avant l'arrivée d'un second besoin concret. Les règles métier doivent rester indépendantes de FastAPI, Twitch et SQLite afin de pouvoir être testées simplement.
 
 ## 5. Modèle d'état
 
@@ -203,7 +214,7 @@ Règles complémentaires :
 - un verrou asynchrone protège `!join`, `!gapull` et `!gastop` contre les traitements concurrents ;
 - chaque transition valide déclenche une sauvegarde SQLite et une diffusion WebSocket.
 
-## 7. Overlay HTML
+## 7. Overlay HTML et clé OBS
 
 L'overlay reste volontairement sans thème. Il fournit des éléments avec des identifiants stables :
 
@@ -216,25 +227,42 @@ L'overlay reste volontairement sans thème. Il fournit des éléments avec des i
 </main>
 ```
 
-Le JavaScript de l'overlay :
+L'URL OBS contient une clé dans son fragment :
 
-1. ouvre le WebSocket ;
-2. reçoit un instantané complet de l'état ;
-3. met à jour le texte et les attributs du DOM ;
-4. masque `#giveaway` dans l'état `HIDDEN` ;
-5. tente automatiquement de se reconnecter en cas de coupure.
+```text
+https://overlay.necsus.dev/plugins/giveaway/overlay#<clé-OBS>
+```
 
-Aucun secret, tirage ou contrôle de permission ne se trouve dans le frontend.
+Le fragment n'est envoyé ni à Nginx ni lors de la requête HTTP initiale. La page HTML et son JavaScript peuvent rester publics, mais ils ne contiennent aucune donnée métier. Le JavaScript :
+
+1. lit la clé depuis `window.location.hash` ;
+2. ouvre le WebSocket du plugin ;
+3. envoie la clé comme premier message dans un délai borné ;
+4. attend la confirmation avant de recevoir l'état ;
+5. met à jour le texte et les attributs du DOM ;
+6. masque `#giveaway` dans l'état `HIDDEN` ;
+7. tente automatiquement de se reconnecter en cas de coupure.
+
+La clé est une capacité de lecture, pas une session administrative. Elle est générée avec une source aléatoire cryptographique, stockée uniquement sous forme de hash et liée au couple streamer/plugin. L'administration peut la régénérer : la nouvelle clé remplace atomiquement l'ancienne, qui devient immédiatement inutilisable. La valeur en clair n'est montrée qu'au moment de générer le lien.
 
 ## 8. Protocole WebSocket
 
 ### Endpoint
 
 ```text
-GET /ws/overlay/{login_twitch}
+GET /plugins/giveaway/ws
 ```
 
-À chaque connexion, le serveur résout le login Twitch, rattache la connexion au gestionnaire WebSocket de ce streamer et envoie immédiatement son état complet. Les mises à jour suivantes utilisent le même format afin d'éviter plusieurs protocoles différents.
+Le serveur canonique accepte la connexion sans diffuser d'état, puis attend pendant cinq secondes au maximum un premier message d'authentification. Une clé absente, invalide ou reçue après le délai ferme la connexion avec le code WebSocket `1008`. Après validation, le serveur résout le streamer associé, rattache la connexion à son gestionnaire et envoie l'état complet. Les mises à jour suivantes utilisent le même format afin d'éviter plusieurs protocoles différents.
+
+Exemple de premier message client :
+
+```json
+{
+  "type": "overlay.authenticate",
+  "token": "valeur-lue-depuis-le-fragment"
+}
+```
 
 Exemple :
 
@@ -261,7 +289,7 @@ Exemple :
 }
 ```
 
-Le serveur conserve les connexions actives par streamer et supprime proprement les clients déconnectés. Une source OBS rechargée retrouve immédiatement l'état du streamer ciblé, sans diffusion croisée entre les chaînes.
+Le serveur conserve les connexions authentifiées par streamer, plugin et empreinte de clé, puis supprime proprement les clients déconnectés. Une rotation ferme immédiatement les connexions associées à l'ancienne empreinte. Dans le mode mono-streamer, une authentification OAuth avec un compte différent ferme également toutes les connexions OBS de l'ancien streamer avec le code `1008` ; une réauthentification du même compte les conserve. Une source OBS rechargée retrouve l'état ciblé si sa clé reste valide, sans diffusion croisée entre les chaînes ou les plugins. La route HTTP `/api/state` actuelle doit être supprimée ou soumise au même contrôle avant que l'accès OBS soit considéré comme protégé.
 
 ## 9. Administration Twitch
 
@@ -292,6 +320,8 @@ L'accès au LAN ou au tailnet constitue la première barrière. Toute personne a
 | `PUT` | `/api/admin/settings` | Valide et enregistre ses réglages. |
 | `GET` | `/api/admin/history` | Liste paginée de ses giveaways uniquement. |
 | `GET` | `/api/admin/history/{id}` | Retourne un giveaway s'il lui appartient. |
+| `GET` | `/api/admin/plugins/giveaway/overlay-access` | Retourne l'état et la date de rotation de la clé, jamais sa valeur. |
+| `POST` | `/api/admin/plugins/giveaway/overlay-access/rotate` | Invalide l'ancienne clé et retourne une fois la nouvelle URL OBS. |
 | `GET` | `/health` | Vérifie que le service répond. |
 
 ### Session et isolation
@@ -301,6 +331,7 @@ L'accès au LAN ou au tailnet constitue la première barrière. Toute personne a
 - identifiant Twitch de session utilisé dans chaque requête SQL ;
 - aucune confiance accordée à un `broadcaster_id` fourni par le navigateur ;
 - un giveaway d'un autre streamer retourne `404`, afin de ne pas révéler son existence ;
+- la rotation d'une clé OBS exige la session du streamer propriétaire et ne modifie aucune autre clé ;
 - déconnexion et expiration de session prises en charge.
 
 ### Paramètres par streamer
@@ -317,6 +348,8 @@ L'identifiant Twitch du streamer provient uniquement d'OAuth et n'est pas modifi
 ### Configuration locale actuelle
 
 Le développement local utilise un fichier `.env` à la racine, chargé par `pydantic-settings`. Il contient les secrets, le callback HTTPS, les identifiants globaux du bot et le chemin du fichier JSON. L'identité streamer n'y figure plus. Les réglages globaux servent à initialiser `settings.json` lorsque celui-ci n'existe pas encore.
+
+Le callback canonique déclaré exactement dans Twitch et utilisé par la configuration locale est `https://overlay.necsus.dev/auth/twitch/callback`. Le parcours OAuth complet a été validé sur ce domaine. L'ancien callback et l'ancien virtual host ont été supprimés sans redirection.
 
 Le Client Secret est représenté avec `SecretStr`. Le fichier `.env` réel reste ignoré par Git et ne doit jamais être lu, affiché ou journalisé. `.env.example` documente les noms attendus avec des valeurs fictives. Les access tokens et refresh tokens ne sont pas saisis manuellement : ils sont obtenus par les parcours OAuth FastAPI, confiés à TwitchIO, sauvegardés dans `.tio.tokens.json` et rechargés au démarrage. Ce fichier est ignoré par Git et ne doit jamais être lu, affiché ou partagé.
 
@@ -432,6 +465,18 @@ Une contrainte unique sur `(giveaway_id, twitch_user_id)` empêche les doubles i
 
 Les contraintes sur `(giveaway_id, twitch_user_id)` et `(giveaway_id, draw_order)` empêchent respectivement un participant de gagner deux fois et deux gagnants d'occuper la même position. La clé étrangère composée garantit que chaque gagnant était inscrit au giveaway.
 
+### Table `overlay_access_keys`
+
+| Colonne | Type | Description |
+|---|---|---|
+| `streamer_id` | TEXT, clé primaire composée | Propriétaire de la clé, référence `streamers.twitch_user_id`. |
+| `plugin_slug` | TEXT, clé primaire composée | Plugin autorisé, par exemple `giveaway`. |
+| `token_hash` | TEXT | Empreinte SHA-256 de la clé aléatoire ; la valeur en clair n'est jamais persistée. |
+| `created_at` | TEXT | Date UTC de création initiale. |
+| `rotated_at` | TEXT | Date UTC de dernière rotation. |
+
+La table et ses contraintes sont initialisées dans SQLite. L'administration génère et régénère les clés, ne persiste que leur empreinte et affiche la nouvelle URL une seule fois. Une seule clé est active par couple `(streamer_id, plugin_slug)` et un index unique sur `token_hash` permet de résoudre son propriétaire sans ambiguïté. La clé possède 256 bits d'entropie ; une recherche indexée par son empreinte SHA-256 suffit et rend inutile un hash de mot de passe coûteux ou une comparaison caractère par caractère. La rotation remplace l'empreinte dans une transaction, ferme les WebSockets authentifiés avec l'ancienne clé et retourne la nouvelle URL une seule fois.
+
 ### Utilisation
 
 - SQLite fonctionne en mode WAL ;
@@ -531,7 +576,7 @@ Le déploiement doit être déclaratif :
 - unité systemd avec redémarrage automatique et `LimitNOFILE=65536` ;
 - un seul worker Uvicorn tant que l'état reste en mémoire ;
 - service applicatif lié à `127.0.0.1` ;
-- publication HTTPS privée sur le LAN avec Nginx lié à `192.168.1.112:443`, certificat ACME DNS-01 Cloudflare et accès Tailscale séparé ;
+- publication HTTPS privée canonique sur `overlay.necsus.dev`, avec Nginx lié à `192.168.1.112:443`, certificat ACME DNS-01 Cloudflare et accès Tailscale séparé ;
 - journaux applicatifs accessibles avec `journalctl` et access logs réduits ;
 - sauvegarde périodique du JSON et de SQLite.
 
@@ -572,14 +617,19 @@ Les tests automatisés décrits ci-dessous restent l'objectif avant la fin du MV
 - chargement et validation de `.env` sans exposition des secrets ;
 - validation et écriture atomique du JSON global ;
 - résolution d'un runtime par identifiant Twitch ;
-- isolation des commandes, états et WebSockets entre streamers.
+- isolation des commandes, états et WebSockets entre streamers ;
+- génération, validation et rotation atomique d'une clé OBS par streamer et par plugin ;
+- refus des clés OBS absentes, invalides, révoquées ou utilisées pour un autre plugin.
 
 ### Tests d'intégration
 
 - enregistrement d'un cycle complet dans SQLite ;
 - restauration après redémarrage ;
-- réception de l'état initial par WebSocket ;
-- diffusion d'une modification à plusieurs overlays ;
+- aucun état envoyé avant le premier message d'authentification WebSocket ;
+- réception de l'état initial après validation de la clé OBS ;
+- fermeture avec le code `1008` en cas de clé absente ou invalide ;
+- invalidation immédiate de l'ancien lien après rotation ;
+- diffusion d'une modification à plusieurs overlays authentifiés ;
 - authentification Twitch, état OAuth anti-CSRF et session signée ;
 - création et actualisation d'un streamer à la connexion ;
 - historique filtré par le streamer de session ;
@@ -594,8 +644,8 @@ Les tests automatisés décrits ci-dessous restent l'objectif avant la fin du MV
 ### Scénario final
 
 1. La DevBox démarre le bot dédié et restaure les streamers autorisés.
-2. Les streamers A et B ouvrent `/admin` depuis le tailnet et se connectent avec Twitch.
-3. Chacun autorise le bot sur sa chaîne et obtient son URL `/overlay/<login_twitch>`.
+2. Les streamers A et B ouvrent `/admin` depuis le LAN ou le tailnet et se connectent avec Twitch.
+3. Chacun autorise le bot sur sa chaîne et génère son URL `https://overlay.necsus.dev/plugins/giveaway/overlay#<clé-OBS>`.
 4. Les deux streamers lancent simultanément un giveaway différent.
 5. Les commandes et participants de A ne modifient jamais l'état de B.
 6. Chaque overlay reçoit uniquement les mises à jour de son streamer.
@@ -618,12 +668,16 @@ Les tests automatisés décrits ci-dessous restent l'objectif avant la fin du MV
 11. [x] Authentification Twitch dans FastAPI, état OAuth et session signée.
 12. [x] Souscription dynamique du bot global au chat du streamer actif.
 13. [x] Première page `/admin` : identité, bot, état du chat, URL OBS et déconnexion.
-14. [ ] Réduction des payloads et diffusion WebSocket non bloquante avec backpressure.
-15. [ ] SQLite WAL, accès non bloquant et cohérence transactionnelle mémoire/base.
-16. [ ] Supervision TwitchIO, santé `live`/`ready` et limites de ressources.
-17. [ ] Migrations SQLite versionnées et rattachement des données existantes à un streamer.
-18. [ ] Registre de runtimes isolés par streamer et overlays `/overlay/{login}`.
-19. [ ] Extension de l'administration et de l'historique filtrés par streamer.
-20. [ ] Abonnements EventSub simultanés pour plusieurs streamers.
-21. [ ] Déploiement NixOS et publication Tailscale.
-22. [ ] Tests automatisés multi-streamer, charge et essais depuis plusieurs OBS.
+14. [x] DNS, certificat et virtual host de transition pour `overlay.necsus.dev`.
+15. [x] Migration des routes du giveaway sous `/plugins/giveaway`.
+16. [x] Clé OBS hashée par streamer/plugin, authentification WebSocket et rotation depuis `/admin`.
+17. [x] Migration du callback Twitch vers `overlay.necsus.dev`, puis suppression de `giveaway.necsus.dev` sans redirection.
+18. [ ] Réduction des payloads et diffusion WebSocket non bloquante avec backpressure.
+19. [ ] SQLite WAL, accès non bloquant et cohérence transactionnelle mémoire/base.
+20. [ ] Supervision TwitchIO, santé `live`/`ready` et limites de ressources.
+21. [ ] Migrations SQLite versionnées et rattachement des données existantes à un streamer.
+22. [ ] Registre de runtimes isolés par streamer et par plugin.
+23. [ ] Extension de l'administration et de l'historique filtrés par streamer.
+24. [ ] Abonnements EventSub simultanés pour plusieurs streamers.
+25. [ ] Service applicatif systemd NixOS et suppression du lancement tmux.
+26. [ ] Tests automatisés multi-streamer, charge et essais depuis plusieurs OBS.

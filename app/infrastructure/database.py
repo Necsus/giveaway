@@ -29,6 +29,20 @@ def initialize_database(connection: sqlite3.Connection) -> None:
             updated_at TEXT NOT NULL
         );
 
+        CREATE TABLE IF NOT EXISTS overlay_access_keys (
+            streamer_id TEXT NOT NULL,
+            plugin_slug TEXT NOT NULL,
+            token_hash TEXT NOT NULL UNIQUE,
+            created_at TEXT NOT NULL,
+            rotated_at TEXT NOT NULL,
+
+            PRIMARY KEY (streamer_id, plugin_slug),
+
+            FOREIGN KEY (streamer_id)
+                REFERENCES streamers(twitch_user_id)
+                ON DELETE CASCADE
+        );
+
         CREATE TABLE IF NOT EXISTS giveaways (
             id TEXT PRIMARY KEY,
             lot TEXT NOT NULL,

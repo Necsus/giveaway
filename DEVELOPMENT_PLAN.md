@@ -1,10 +1,78 @@
 # Plan de développement
 
-Plan pour faire évoluer le giveaway mono-streamer actuel vers un service multi-streamer utilisable simultanément depuis plusieurs chaînes Twitch.
+Plan pour faire évoluer le giveaway mono-streamer actuel vers une plateforme d'overlays Twitch extensible, puis vers un service multi-streamer utilisable simultanément depuis plusieurs chaînes.
 
-> Avancement actuel : le parcours complet fonctionne avec une identité bot et broadcaster configurée au démarrage. La priorité est désormais une administration OAuth mono-streamer : le bot global reste fixe, tandis que le streamer actif et son canal proviennent de la connexion à `/admin`. La cible multi-streamer simultanée viendra ensuite.
+> Avancement actuel : le parcours Twitch et l'administration OAuth mono-streamer fonctionnent sur `overlay.necsus.dev`. Le giveaway est entièrement isolé sous `/plugins/giveaway`, ses assets possèdent leur propre montage et sa source OBS est protégée par une clé révocable propre au streamer et au plugin. La prochaine priorité redevient la stabilisation avant le multi-streamer.
 
-## Priorité active — administration mono-streamer dynamique
+## Étape terminée — plateforme d'overlays et accès OBS
+
+### A. Domaine canonique et transition réseau
+
+- [x] Ajouter `overlay.necsus.dev` dans Cloudflare avec une résolution DNS privée vers `192.168.1.112` et le proxy désactivé.
+- [x] Obtenir un certificat public ACME par challenge DNS-01 Cloudflare.
+- [x] Valider Nginx, `/health` et le WebSocket sur le nouveau domaine.
+- [x] Servir temporairement `overlay.necsus.dev` et `giveaway.necsus.dev` en parallèle pour préserver OAuth.
+- [x] Activer durablement la nouvelle génération NixOS avec `nixos-rebuild switch`.
+- [x] Déclarer `https://overlay.necsus.dev/auth/twitch/callback` dans la console Twitch.
+- [x] Utiliser `https://overlay.necsus.dev/auth/twitch/callback` dans la configuration locale.
+- [x] Valider un parcours OAuth complet sur le nouveau domaine.
+- [x] Supprimer `giveaway.necsus.dev`, son certificat et son DNS sans redirection.
+
+#### Validation A
+
+- `overlay.necsus.dev` résout vers `192.168.1.112`.
+- Le certificat est reconnu sans installation d'une autorité locale.
+- Nginx écoute uniquement sur l'adresse LAN tandis que Tailscale conserve sa propre écoute.
+- Uvicorn écoute uniquement sur `127.0.0.1:8000`.
+- Aucun port n'est redirigé depuis Internet.
+
+### B. Namespace du plugin giveaway
+
+- [x] Exposer `/plugins/giveaway/overlay` en parallèle de l'ancienne page.
+- [x] Exposer `/plugins/giveaway/ws` en parallèle de l'ancien WebSocket.
+- [x] Faire utiliser les nouvelles routes par le JavaScript de l'overlay et par l'URL copiée depuis `/admin`.
+- [x] Supprimer `/api/state` afin qu'aucun état ne reste publiquement lisible.
+- [x] Déplacer les fichiers statiques du giveaway sous `static/plugins/giveaway` et les servir par le chemin canonique `/plugins/giveaway/static`.
+- [x] Retirer l'alias secondaire `/static/plugins/giveaway/*` en isolant le montage des assets administratifs.
+- [x] Conserver `/admin`, `/auth/twitch/*` et `/health` comme routes communes à la plateforme.
+- [x] Supprimer `/overlay`, `/api/state` et `/ws/overlay` après validation des nouvelles routes.
+
+#### Validation B
+
+- Toutes les routes propres au giveaway se trouvent sous `/plugins/giveaway`.
+- Un futur `/plugins/chat` peut être ajouté sans collision de routes, de fichiers statiques ou de WebSockets.
+- Les anciennes URLs ne restent pas accessibles après la migration.
+
+### C. Clé OBS par streamer et par plugin
+
+- [x] Créer la table `overlay_access_keys` avec clé primaire `(streamer_id, plugin_slug)`, hash unique et suppression en cascade.
+- [x] Générer une clé avec une source aléatoire cryptographique et au moins 256 bits d'entropie.
+- [x] Calculer une empreinte SHA-256 hexadécimale sans conserver la clé en clair.
+- [x] Persister uniquement cette empreinte dans `overlay_access_keys` avec la clé composée `(streamer_id, plugin_slug)` en conservant la date de création lors d'une rotation.
+- [x] Résoudre une empreinte valide vers son streamer uniquement pour le plugin demandé.
+- [x] Placer la clé en fragment de l'URL OBS, jamais dans la query string.
+- [x] Lire le fragment côté overlay et envoyer la clé comme premier message WebSocket.
+- [x] Interdire tout instantané ou abonnement aux mises à jour avant validation sur le WebSocket canonique.
+- [x] Fermer avec le code WebSocket `1008` si la clé est absente, invalide ou reçue trop tard.
+- [x] Résoudre la clé par son empreinte SHA-256 unique et indexée, sans traiter la clé comme un mot de passe à faible entropie.
+- [x] Exposer un endpoint `POST` protégé qui génère la clé, persiste son hash et retourne une fois l'URL avec `Cache-Control: no-store`.
+- [x] Exposer un endpoint `GET` protégé qui indique si une clé existe et sa date de rotation sans révéler le hash.
+- [x] Ajouter dans `/admin` l'état de la clé et une action de génération ou régénération.
+- [x] Fermer avec le code `1008` les WebSockets associés à l'ancienne clé après la rotation atomique de son empreinte.
+- [x] Fermer les connexions OBS de l'ancien streamer lorsqu'un compte différent devient actif, sans interrompre celles du même streamer lors d'une réauthentification.
+- [x] Afficher la nouvelle URL complète une seule fois et ne jamais persister la clé en clair.
+
+#### Validation C
+
+- Une session Twitch de navigateur n'est pas requise dans OBS.
+- La page HTML seule ne révèle aucune donnée du giveaway.
+- Une clé du plugin giveaway ne donne accès à aucun autre plugin.
+- Régénérer le lien du giveaway ne casse pas les autres overlays du streamer.
+- L'ancien lien cesse de recevoir des données dès la rotation.
+- Remplacer le streamer actif masque et déconnecte immédiatement ses anciennes sources OBS.
+- Une clé ou un fragment n'apparaît dans aucun journal d'accès.
+
+## Étape terminée — administration mono-streamer dynamique
 
 Cette étape rend une même installation utilisable successivement par différents streamers sans modifier sa configuration locale. Un seul streamer et un seul giveaway restent actifs à la fois.
 
@@ -205,12 +273,12 @@ Le nettoyage suit toujours l'ordre **remplacer, valider, puis supprimer** afin d
 
 ## 4. Runtimes et overlays isolés
 
-- [ ] Créer un registre de moteurs et services indexé par identifiant Twitch.
+- [ ] Créer un registre de moteurs et services indexé par identifiant Twitch et par plugin.
 - [ ] Restaurer un moteur actif par streamer au démarrage.
-- [ ] Séparer les connexions WebSocket par streamer.
-- [ ] Exposer `/overlay/{login_twitch}`.
-- [ ] Exposer `/ws/overlay/{login_twitch}`.
-- [ ] Résoudre le login vers l'identifiant Twitch stable.
+- [ ] Séparer les connexions WebSocket par streamer et par plugin.
+- [ ] Exposer l'overlay giveaway sous `/plugins/giveaway/overlay` avec une clé associée au streamer.
+- [ ] Exposer son WebSocket sous `/plugins/giveaway/ws`.
+- [ ] Résoudre la clé vers l'identifiant Twitch stable sans exposer celui-ci dans l'URL.
 - [ ] Actualiser le login après chaque authentification Twitch.
 
 ### Validation
@@ -242,7 +310,7 @@ Le nettoyage suit toujours l'ordre **remplacer, valider, puis supprimer** afin d
 - [ ] Utiliser un état OAuth aléatoire, court et à usage unique.
 - [ ] Créer une session signée dans un cookie `HttpOnly`, `Secure` et `SameSite=Lax`.
 - [ ] Ajouter la déconnexion et l'expiration de session.
-- [ ] Autoriser la création d'un espace à tout membre ayant déjà accès au tailnet.
+- [ ] Autoriser la création d'un espace à tout membre ayant déjà accès au LAN ou au tailnet.
 - [ ] Ne jamais accepter un `broadcaster_id` fourni par le navigateur comme identité.
 - [ ] Permettre au streamer de modifier son préfixe et l'activation de son espace.
 
@@ -269,7 +337,7 @@ Le nettoyage suit toujours l'ordre **remplacer, valider, puis supprimer** afin d
 ## 8. Déploiement et tests
 
 - [ ] Déployer l'application avec systemd dans la configuration NixOS.
-- [x] Publier le service en HTTPS sur le LAN avec Nginx lié à `192.168.1.112:443` et un certificat ACME DNS-01 Cloudflare, sans exposition Internet.
+- [x] Préparer et valider `overlay.necsus.dev` en HTTPS sur le LAN avec Nginx lié à `192.168.1.112:443` et un certificat ACME DNS-01 Cloudflare, sans exposition Internet.
 - [x] Conserver Tailscale Serve sur son adresse propre sans conflit avec l'écoute LAN.
 - [ ] Ajouter les tests unitaires et d'intégration.
 - [ ] Tester deux streamers et plusieurs sources OBS simultanément.
@@ -277,4 +345,4 @@ Le nettoyage suit toujours l'ordre **remplacer, valider, puis supprimer** afin d
 
 ## MVP multi-streamer terminé
 
-Le MVP cible est terminé lorsque deux streamers connectés avec Twitch peuvent lancer simultanément des giveaways indépendants, utiliser chacun `/overlay/{login_twitch}` et consulter uniquement leur propre historique, avec un seul bot dédié partagé par l'instance.
+Le MVP cible est terminé lorsque deux streamers connectés avec Twitch peuvent lancer simultanément des giveaways indépendants, utiliser chacun une URL protégée sous `https://overlay.necsus.dev/plugins/giveaway/overlay#<clé-OBS>` et consulter uniquement leur propre historique, avec un seul bot dédié partagé par l'instance. La structure doit permettre l'ajout ultérieur d'autres plugins possédant leurs propres clés sans abstraction générique prématurée.

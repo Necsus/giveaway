@@ -123,22 +123,65 @@
                 <svg viewBox="0 0 24 24"><path d="M4 5h16v14H4zM8 9h8m-8 4h5"/></svg>
               </div>
               <div>
-                <p class="section-kicker">Source navigateur</p>
-                <h3 id="overlay-title">URL de l’overlay OBS</h3>
+                <p class="section-kicker">Plugin giveaway</p>
+                <h3 id="overlay-title">Accès OBS sécurisé</h3>
               </div>
             </div>
-            <p class="section-description">
-              Ajoutez cette adresse comme source navigateur dans OBS pour afficher le giveaway à l’écran.
+
+            <p id="overlay-description" class="section-description">
+              Générez une adresse confidentielle pour afficher ce giveaway dans une source navigateur OBS.
             </p>
-            <label class="sr-only" for="overlay-url">Adresse de l’overlay</label>
-            <div class="copy-field">
-              <input id="overlay-url" type="url" readonly>
-              <button id="copy-overlay-url" class="button button-secondary" type="button">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 9h10v11H9zM5 15H4V4h10v1"/></svg>
-                <span>Copier</span>
+
+            <div class="overlay-access-summary">
+              <div>
+                <span id="overlay-access-badge" class="status-pill status-neutral">
+                  <span class="status-dot" aria-hidden="true"></span>
+                  <span id="overlay-access-label">Vérification de l’accès…</span>
+                </span>
+                <p id="overlay-rotated-at" class="overlay-rotated-at"></p>
+              </div>
+
+              <button
+                id="rotate-overlay-access"
+                class="button button-primary"
+                type="button"
+                disabled
+              >
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5m9.5-3A7 7 0 0 0 6.2 6M5.5 15A7 7 0 0 0 17.8 18"/></svg>
+                <span id="rotate-overlay-access-label">Générer le lien</span>
               </button>
             </div>
-            <p id="copy-status" class="feedback" role="status" aria-live="polite"></p>
+
+            <div class="overlay-url-field">
+              <label class="field-label" for="overlay-url">Adresse de la source navigateur</label>
+              <div class="copy-field">
+                <input
+                  id="overlay-url"
+                  type="url"
+                  placeholder="Générez un nouveau lien OBS sécurisé"
+                  aria-describedby="overlay-url-help copy-status"
+                  readonly
+                >
+                <button
+                  id="copy-overlay-url"
+                  class="button button-secondary"
+                  type="button"
+                  disabled
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 9h10v11H9zM5 15H4V4h10v1"/></svg>
+                  <span>Copier</span>
+                </button>
+              </div>
+              <p id="copy-status" class="feedback" role="status" aria-live="polite"></p>
+            </div>
+
+            <div id="overlay-url-help" class="security-note">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10V7a5 5 0 0 1 10 0v3M5 10h14v11H5zM12 14v3"/></svg>
+              <p>
+                <strong>Conservez ce lien confidentiel.</strong>
+                Il n’est affiché qu’après sa génération. Le régénérer invalidera immédiatement l’ancienne source OBS.
+              </p>
+            </div>
           </section>
 
           <section class="session-footer" aria-labelledby="logout-title">

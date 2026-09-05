@@ -27,6 +27,8 @@ from app.web.routes.overlay import create_overlay_router
 from app.web.websocket import OverlayConnectionManager
 
 STATIC_DIRECTORY = Path(__file__).parent / "web" / "static"
+ADMIN_STATIC_DIRECTORY = STATIC_DIRECTORY / "admin"
+GIVEAWAY_STATIC_DIRECTORY = STATIC_DIRECTORY / "plugins" / "giveaway"
 
 install_oauth_access_log_filter()
 
@@ -73,6 +75,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     app.state.session_signer = session_signer
     app.state.oauth_state_store = OAuthStateStore()
     app.state.twitch_oauth_client = twitch_oauth_client
+    app.state.overlay_connections = overlay_connections
 
     giveaway_command_handler = GiveawayCommandHandler(
         service=giveaway_service,
@@ -129,7 +132,12 @@ app.include_router(
     create_overlay_router(
         giveaway_engine,
         overlay_connections,
-        STATIC_DIRECTORY,
+        GIVEAWAY_STATIC_DIRECTORY,
     )
 )
-app.mount("/static", StaticFiles(directory=STATIC_DIRECTORY), name="static")
+app.mount(
+    "/plugins/giveaway/static",
+    StaticFiles(directory=GIVEAWAY_STATIC_DIRECTORY),
+    name="giveaway-static",
+)
+app.mount("/static", StaticFiles(directory=ADMIN_STATIC_DIRECTORY), name="static")

@@ -14,7 +14,7 @@ from app.application.oauth_state import OAuthStateStore
 from app.application.session import SESSION_COOKIE_NAME, SessionSigner
 from app.core.configuration import ApplicationConfiguration
 from app.core.environment import Settings
-from app.infrastructure.streamers import save_active_streamer
+from app.infrastructure.streamers import load_active_streamer, save_active_streamer
 from app.infrastructure.twitch import GiveawayTwitchBot
 from app.infrastructure.twitch_oauth import (
     BOT_SCOPE_NAMES,
@@ -23,6 +23,7 @@ from app.infrastructure.twitch_oauth import (
     TwitchOAuthClient,
     build_authorization_url,
 )
+from app.web.websocket import OverlayConnectionManager
 
 LOGGER = logging.getLogger("uvicorn.error")
 
@@ -186,6 +187,7 @@ async def twitch_callback(
         request.app.state.database_connection,
     )
     try:
+        previous_active_streamer = load_active_streamer(connection)
         save_active_streamer(
             connection,
             twitch_user_id=authorization.twitch_user_id,
@@ -198,6 +200,19 @@ async def twitch_callback(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Unable to persist the Twitch identity",
         ) from None
+
+    if (
+        previous_active_streamer is not None
+        and previous_active_streamer.twitch_user_id
+        != authorization.twitch_user_id
+    ):
+        overlay_connections = cast(
+            OverlayConnectionManager,
+            request.app.state.overlay_connections,
+        )
+        await overlay_connections.disconnect_streamer(
+            previous_active_streamer.twitch_user_id,
+        )
 
     giveaway_command_handler = cast(
         GiveawayCommandHandler,
