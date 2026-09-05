@@ -174,8 +174,9 @@ Le rendu visuel est défini dans le champ **CSS personnalisé** de la source OBS
 
 ## Documentation
 
-- [`TECHNICAL_SPEC.md`](./TECHNICAL_SPEC.md) : architecture et choix techniques ;
-- [`DEVELOPMENT_PLAN.md`](./DEVELOPMENT_PLAN.md) : avancement du MVP.
+- [`TECHNICAL_SPEC.md`](./docs/TECHNICAL_SPEC.md) : architecture et choix techniques ;
+- [`DEVELOPMENT_PLAN.md`](./docs/DEVELOPMENT_PLAN.md) : avancement du MVP ;
+- [`CHAT_OVERLAY_PLAN.md`](./docs/CHAT_OVERLAY_PLAN.md) : plan de développement de l'overlay de chat.
 
 ## Licence
 
